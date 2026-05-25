@@ -1,0 +1,12 @@
+<!-- FULL IMAGE MODAL -->
+<div class="modal-overlay" x-show="fullImage" x-cloak @click.self="fullImage=null">
+    <div class="modal-box" style="max-width: 90vw;">
+        <div class="modal-head">
+            <h3>Full Screen</h3>
+            <button class="modal-close" @click="fullImage=null">✕</button>
+        </div>
+        <div class="modal-body p-0">
+            <img :src="fullImage" style="width: 100%;">
+        </div>
+    </div>
+</div>

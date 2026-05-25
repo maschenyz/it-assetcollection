@@ -1,0 +1,30 @@
+<!-- VIEW: BLACKLIST -->
+<section x-show="view==='blacklist'" x-cloak>
+    <div class="detail-grid-3 mb-3">
+        <div class="hw-card">
+            <div class="hw-card-title">Add Blacklist</div>
+            <div class="p-2">
+                <input type="text" class="search-input w-100 mb-2" placeholder="Program Name (e.g. WPS)" x-model="newBlacklist.name">
+                <input type="text" class="search-input w-100 mb-2" placeholder="Reason" x-model="newBlacklist.reason">
+                <button class="btn-primary w-100" @click="addBlacklist()">➕ Add to Blacklist</button>
+            </div>
+        </div>
+        <div class="hw-card" style="grid-column: span 2;">
+            <div class="hw-card-title">Active Blacklist Rules</div>
+            <div class="table-wrapper" style="max-height: 300px;">
+                <table>
+                    <thead><tr><th>Program Name</th><th>Reason</th><th>Action</th></tr></thead>
+                    <tbody>
+                        <template x-for="b in blacklist" :key="b.id">
+                            <tr>
+                                <td class="fw-bold text-danger" x-text="b.name"></td>
+                                <td x-text="b.reason"></td>
+                                <td><button class="btn-sm text-danger" @click="deleteBlacklist(b.id)">🗑️ Remove</button></td>
+                            </tr>
+                        </template>
+                    </tbody>
+                </table>
+            </div>
+        </div>
+    </div>
+</section>

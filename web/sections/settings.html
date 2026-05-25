@@ -1,0 +1,27 @@
+<!-- VIEW: SETTINGS -->
+<section x-show="view==='settings'" x-cloak>
+    <div class="detail-grid-3">
+        <div class="hw-card">
+            <div class="hw-card-title">Notifications</div>
+            <div class="p-2">
+                <label class="small fw-bold">Telegram Bot Token</label>
+                <input type="password" class="search-input w-100 mb-2" x-model="settings.TELEGRAM_BOT_TOKEN">
+                <label class="small fw-bold">Telegram Chat ID</label>
+                <input type="text" class="search-input w-100 mb-2" x-model="settings.TELEGRAM_CHAT_ID">
+                <label class="small fw-bold">Line Notify Token</label>
+                <input type="password" class="search-input w-100 mb-2" x-model="settings.LINE_NOTIFY_TOKEN">
+                <button class="btn-primary w-100 mt-2" @click="saveSettings()">💾 Save Tokens</button>
+            </div>
+        </div>
+        <div class="hw-card">
+            <div class="hw-card-title">System Policies</div>
+            <div class="p-2">
+                <label class="small fw-bold">Overtime Check (Hour)</label>
+                <input type="number" class="search-input w-100 mb-2" x-model="settings.overtime_check_hour">
+                <label class="small fw-bold">Heartbeat Timeout (Min)</label>
+                <input type="number" class="search-input w-100 mb-2" x-model="settings.heartbeat_timeout_minutes">
+                <button class="btn-primary w-100 mt-2" @click="saveSettings()">💾 Save Policies</button>
+            </div>
+        </div>
+    </div>
+</section>

@@ -1,0 +1,66 @@
+<!DOCTYPE html>
+<html lang="th">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Devices | Yuna Asset</title>
+
+    <link rel="stylesheet" href="/style.css">
+
+    <script defer src="https://cdn.jsdelivr.net/npm/alpinejs@3.x.x/dist/cdn.min.js"></script>
+</head>
+<body x-data="devicesPage()" x-init="init()">
+
+<div class="app-container">
+
+    <!-- Sidebar -->
+    <nav class="sidebar">
+        <div class="logo">
+            <span class="logo-icon-sm">💠</span>
+            <span class="logo-text">Yuna Asset</span>
+        </div>
+
+        <ul class="nav-links">
+            <li class="nav-item">
+                <a href="/index.html">📊 Dashboard</a>
+            </li>
+
+            <li class="nav-item active">
+                <a href="/devices.html">💻 Devices</a>
+            </li>
+
+            <li class="nav-item">
+                <a href="/printers.html">🖨️ Printers</a>
+            </li>
+        </ul>
+    </nav>
+
+    <!-- Main -->
+    <main class="main-content">
+
+        <div class="page-header">
+            <div>
+                <h1 class="page-title">Computer Inventory</h1>
+                <p class="page-sub">Asset Management</p>
+            </div>
+        </div>
+
+        <section>
+            <div class="card">
+                <div class="card-header">
+                    <h3 class="card-title">Computer Inventory</h3>
+
+                    <input
+                        type="text"
+                        class="search-input"
+                        placeholder="Search devices..."
+                        x-model="searchQuery"
+                    >
+                </div>
+
+                <div class="table-wrapper">
+                    <table>
+                        <thead>
+                            <tr>
+                                <th>Device</th>
+</html>

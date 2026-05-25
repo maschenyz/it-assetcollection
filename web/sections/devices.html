@@ -1,0 +1,62 @@
+<!-- VIEW: DEVICES LIST (INVENTORY) -->
+<section x-show="view==='devices'" x-cloak>
+    <div class="card">
+        <div class="card-header">
+            <h3 class="card-title">Computer Inventory</h3>
+            <input type="text" class="search-input" placeholder="Search devices..." x-model="searchQuery">
+        </div>
+        <div class="table-wrapper">
+            <table>
+                <thead>
+                    <tr>
+                        <th>Asset #</th>
+                        <th>Device (Type)</th>
+                        <th>Operating System</th>
+                        <th>Branch Location</th>
+                        <th>Antivirus</th>
+                        <th>Status</th>
+                        <th>Action</th>
+                    </tr>
+                </thead>
+                <tbody>
+                    <template x-for="dev in filteredDevices" :key="dev.uuid">
+                        <tr>
+                            <td class="mono fw-bold" x-text="dev.asset_number || '-'"></td>
+                            <td>
+                                <div class="fw-bold" x-text="dev.hostname"></div>
+                                <span class="badge mt-2" 
+                                      :class="{
+                                          'badge software': dev.device_type === 'Laptop / Notebook',
+                                          'badge hardware': dev.device_type === 'Desktop PC',
+                                          'badge online': dev.device_type === 'All-in-One (AIO)',
+                                          'badge virtual': dev.device_type === 'Virtual Machine (VM)'
+                                      }" 
+                                      x-text="dev.device_type || 'PC'">
+                                </span>
+                            </td>
+                            <td>
+                                <div class="fw-bold" x-text="getOsLabel(dev)"></div>
+                                <div class="mono small text-muted" x-text="dev.ip_address"></div>
+                            </td>
+                            <td>
+                                <div class="fw-bold" x-text="dev.building_name || 'Unassigned'"></div>
+                                <div class="small text-muted" x-text="dev.department_name || '-'"></div>
+                            </td>
+                            <td>
+                                <div>
+                                    <span class="badge" 
+                                          :class="dev.av_enabled === 'true' ? 'online' : 'offline'"
+                                          x-text="dev.av_enabled === 'true' ? '🛡️ Protected' : '⚠️ Unprotected'">
+                                    </span>
+                                    <div class="small text-muted mt-2" x-show="dev.av_version" x-text="dev.av_version"></div>
+                                </div>
+                            </td>
+                            <td><span class="badge" :class="dev.status==='ONLINE'?'online':'offline'" x-text="dev.status"></span></td>
+                            <td><button class="btn-sm" @click="openDetail(dev)">📋 Details</button></td>
+                        </tr>
+                    </template>
+                </tbody>
+            </table>
+        </div>
+    </div>
+</section>

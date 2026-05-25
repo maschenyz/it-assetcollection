@@ -1,0 +1,91 @@
+<!DOCTYPE html>
+<html lang="th">
+
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Yuna Asset | Premium Dashboard</title>
+    <link href="https://fonts.googleapis.com/css2?family=Nunito:wght@300;400;600;700;800&display=swap" rel="stylesheet">
+    <link rel="stylesheet" href="/style.css">
+    <script defer src="https://cdn.jsdelivr.net/npm/alpinejs@3.x.x/dist/cdn.min.js"></script>
+</head>
+
+<body x-data="dashboardApp" x-init="init()">
+    <div class="app-container">
+
+        <!-- ===== SIDEBAR ===== -->
+        <div id="section-sidebar"></div>
+
+        <!-- ===== MAIN CONTENT ===== -->
+        <main class="main-content">
+            <div class="page-header">
+                <div>
+                    <h1 class="page-title" x-text="viewTitle"></h1>
+                    <p class="page-sub" x-text="connected ? 'System Online' : 'Connecting to server...'"></p>
+                </div>
+                <div class="header-actions">
+                    <div class="spinner" x-show="loading"></div>
+                    <button class="btn-primary" @click="refreshData()">🔄 Refresh</button>
+                </div>
+            </div>
+
+            <!-- Sections loaded here -->
+            <div id="section-dashboard"></div>
+            <div id="section-devices"></div>
+            <div id="section-printers"></div>
+            <div id="section-logs"></div>
+            <div id="section-master"></div>
+            <div id="section-reports"></div>
+            <div id="section-blacklist"></div>
+            <div id="section-settings"></div>
+            <div id="section-detail"></div>
+            <div id="section-software"></div>
+            <div id="section-screenshots"></div>
+            <div id="section-live"></div>
+
+        </main>
+    </div>
+
+    <!-- Modals loaded here -->
+    <div id="section-modal-image"></div>
+
+    <script src="/app.js"></script>
+
+    <script>
+        // Load each HTML section into its placeholder
+        const sections = [
+            'sidebar',
+            'dashboard',
+            'devices',
+            'printers',
+            'logs',
+            'master',
+            'reports',
+            'blacklist',
+            'settings',
+            'detail',
+            'software',
+            'screenshots',
+            'live',
+            'modal-image',
+        ];
+
+        sections.forEach(name => {
+            fetch(`sections/${name}.html?v=` + new Date().getTime())
+                .then(r => r.text())
+                .then(html => {
+                    const el = document.getElementById(`section-${name}`);
+                    if (!el) return;
+                    el.innerHTML = html;
+                    // Alpine doesn't automatically initialize dynamically injected HTML
+                    if (window.Alpine && typeof window.Alpine.initTree === 'function') {
+                        window.Alpine.initTree(el);
+                    }
+                })
+                .catch(err => console.warn(`Could not load section: ${name}`, err));
+        });
+
+    </script>
+</body>
+
+</html>

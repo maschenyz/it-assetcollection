@@ -1,0 +1,14 @@
+{
+  "server_url": "http://localhost:8080/api/v1",
+  "agent_token": "yuna_secret_token_2024",
+  "sync_interval_minutes": 30,
+  "poll_interval_seconds": 30,
+  "device_uuid": "25C20A44-7467-063E-D07F-1E75361E753B",
+  "printer_page_counts": {
+    "Pantum BP2300W Series": 3,
+    "Microsoft Print to PDF": 67,
+    "Pantum BP2300W Series 0001": 1,
+    "Brother QL-800": 1
+  },
+  "last_processed_event_record_id": 678299
+}

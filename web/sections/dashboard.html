@@ -1,0 +1,120 @@
+<!-- VIEW: DASHBOARD OVERVIEW -->
+<section x-show="view==='dashboard'" x-cloak x-data="dashboardPageData" x-init="initDashboard()">
+
+    <!-- TOP KPI -->
+    <div class="stats-row stats-row-6 mb-4">
+        <div class="stat-card kpi red">
+            <div class="stat-body">
+                <div class="stat-value" x-text="stats.computers"></div>
+                <div class="stat-label">คอมพิวเตอร์</div>
+            </div>
+            <div class="stat-icon">🖥️</div>
+        </div>
+
+        <div class="stat-card kpi blue">
+            <div class="stat-body">
+                <div class="stat-value" x-text="stats.monitors"></div>
+                <div class="stat-label">จอภาพ</div>
+            </div>
+            <div class="stat-icon">🖵</div>
+        </div>
+
+        <div class="stat-card kpi green">
+            <div class="stat-body">
+                <div class="stat-value" x-text="stats.printers"></div>
+                <div class="stat-label">ปริ้นเตอร์</div>
+            </div>
+            <div class="stat-icon">🖨️</div>
+        </div>
+
+        <div class="stat-card kpi lime">
+            <div class="stat-body">
+                <div class="stat-value" x-text="stats.software"></div>
+                <div class="stat-label">โปรแกรม</div>
+            </div>
+            <div class="stat-icon">📦</div>
+        </div>
+
+        <div class="stat-card kpi orange">
+            <div class="stat-body">
+                <div class="stat-value" x-text="stats.licenses"></div>
+                <div class="stat-label">ลิขสิทธิ์</div>
+            </div>
+            <div class="stat-icon">🔑</div>
+        </div>
+    </div>
+
+    <!-- GRID -->
+    <div class="dashboard-grid">
+
+        <!-- STATUS -->
+        <div class="card dashboard-span-3">
+            <div class="card-header">
+                <h3 class="card-title">คอมพิวเตอร์ โดย Status</h3>
+            </div>
+            <div class="mini-list">
+                <template x-for="item in statusStats" :key="item.name">
+                    <div class="mini-row">
+                        <div class="mini-left">
+                            <div class="mini-badge" x-text="item.count"></div>
+                            <div class="mini-name" x-text="item.name"></div>
+                        </div>
+                    </div>
+                </template>
+            </div>
+        </div>
+
+        <!-- MANUFACTURER -->
+        <div class="card dashboard-span-3">
+            <div class="card-header">
+                <h3 class="card-title">คอมพิวเตอร์ โดย ผู้ผลิต</h3>
+            </div>
+            <div class="mini-list">
+                <template x-for="item in manufacturerStats" :key="item.name">
+                    <div class="mini-row">
+                        <div class="mini-left">
+                            <div class="mini-badge" x-text="item.count"></div>
+                            <div class="mini-name" x-text="item.name"></div>
+                        </div>
+                    </div>
+                </template>
+            </div>
+        </div>
+
+        <!-- TYPE -->
+        <div class="card dashboard-span-3">
+            <div class="card-header">
+                <h3 class="card-title">คอมพิวเตอร์ โดย ประเภท</h3>
+            </div>
+            <div class="mini-list">
+                <template x-for="item in typeStats" :key="item.name">
+                    <div class="mini-row">
+                        <div class="mini-left">
+                            <div class="mini-name" x-text="item.name"></div>
+                        </div>
+                        <div class="mini-badge" x-text="item.count"></div>
+                    </div>
+                </template>
+            </div>
+        </div>
+
+        <!-- MONITOR BRAND -->
+        <div class="card dashboard-span-3">
+            <div class="card-header">
+                <h3 class="card-title">จอภาพ โดย ผู้ผลิต</h3>
+            </div>
+            <div class="mini-list">
+                <template x-for="item in monitorBrands" :key="item.name">
+                    <div class="mini-row">
+                        <div class="mini-left">
+                            <div class="mini-badge" x-text="item.count"></div>
+                            <div class="mini-name" x-text="item.name"></div>
+                        </div>
+                    </div>
+                </template>
+            </div>
+        </div>
+
+    </div>
+
+</section>

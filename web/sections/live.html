@@ -1,0 +1,18 @@
+<!-- VIEW: LIVE CONTROL -->
+<section x-show="view==='live'" x-cloak>
+    <div class="live-grid">
+        <template x-for="dev in devices.filter(d=>d.status==='ONLINE')" :key="dev.uuid">
+            <div class="live-card">
+                <div class="live-card-top">
+                    <div class="fw-bold" x-text="dev.hostname"></div>
+                    <span class="badge online ms-auto">ONLINE</span>
+                </div>
+                <div class="live-actions">
+                    <button class="cmd-btn blue" @click="sendCommand(dev.uuid, 'screenshot', 'Capture')">📸 Screen</button>
+                    <button class="cmd-btn yellow" @click="sendCommand(dev.uuid, 'lock_screen', 'Lock')">🔒 Lock</button>
+                    <button class="cmd-btn red" @click="sendCommand(dev.uuid, 'restart_now', 'Restart')">🔄 Boot</button>
+                </div>
+            </div>
+        </template>
+    </div>
+</section>

@@ -1,0 +1,28 @@
+<!-- VIEW: SOFTWARE REGISTRY -->
+<section x-show="view==='software'" x-cloak>
+    <div class="card">
+        <div class="card-header">
+            <h3 class="card-title">📦 Global Software Registry</h3>
+            <input type="text" class="search-input" placeholder="Search software..." x-model="swSearchQuery">
+        </div>
+        <div class="table-wrapper">
+            <table>
+                <thead><tr><th>Software Name</th><th>Installs</th><th>Status</th></tr></thead>
+                <tbody>
+                    <template x-for="sw in software.filter(s=>s.name.toLowerCase().includes(swSearchQuery.toLowerCase()))" :key="sw.id">
+                        <tr>
+                            <td class="fw-bold" x-text="sw.name"></td>
+                            <td>
+                                <span class="badge online" x-text="sw.install_count + ' devices'"></span>
+                            </td>
+                            <td>
+                                <span x-show="sw.is_blacklisted" class="badge danger">🚫 BLACKLISTED</span>
+                                <span x-show="!sw.is_blacklisted" class="badge" style="background: rgba(168,213,186,0.1); color: var(--sage);">Safe</span>
+                            </td>
+                        </tr>
+                    </template>
+                </tbody>
+            </table>
+        </div>
+    </div>
+</section>

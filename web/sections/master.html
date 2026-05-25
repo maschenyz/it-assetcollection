@@ -1,0 +1,26 @@
+<!-- VIEW: MASTER DATA -->
+<section x-show="view==='master'" x-cloak>
+    <div class="detail-grid-3">
+        <div class="hw-card">
+            <div class="hw-card-title">Add Building</div>
+            <div class="p-2">
+                <input type="text" class="search-input w-100 mb-2" placeholder="Building Name" x-model="newBuilding.name">
+                <input type="text" class="search-input w-100 mb-2" placeholder="Code" x-model="newBuilding.code">
+                <button class="btn-primary w-100" @click="addBuilding()">➕ Save</button>
+            </div>
+        </div>
+        <div class="hw-card" style="grid-column: span 2;">
+            <div class="hw-card-title">Buildings List</div>
+            <div class="table-wrapper">
+                <table>
+                    <thead><tr><th>Name</th><th>Code</th></tr></thead>
+                    <tbody>
+                        <template x-for="b in buildings" :key="b.id">
+                            <tr><td class="fw-bold" x-text="b.name"></td><td class="mono" x-text="b.code"></td></tr>
+                        </template>
+                    </tbody>
+                </table>
+            </div>
+        </div>
+    </div>
+</section>

@@ -1,0 +1,109 @@
+<!-- VIEW: PRINTERS -->
+<section x-show="view==='printers'" x-cloak>
+    <div class="card">
+        <div class="card-header">
+            <h3 class="card-title">🖨️ Printer Registry</h3>
+            <button class="btn-primary" @click="showAddPrinter=true">+ Add New Printer</button>
+        </div>
+        <div class="table-wrapper">
+            <table>
+                <thead><tr><th>Name / Model</th><th>Brand</th><th>Location</th><th>IP Address</th><th>Pages (Toner / Total)</th><th>Last Ink Change</th><th>Action</th></tr></thead>
+                <tbody>
+                    <template x-for="p in printers" :key="p.id">
+                        <tr>
+                            <td>
+                                <div style="display: flex; align-items: center; gap: 8px;">
+                                    <span class="fw-bold" x-text="p.name"></span>
+                                    <span class="badge" :class="p.type === 'USB' ? 'usb' : (p.type === 'USB (Disconnected)' ? 'usb-disconnected' : (p.type === 'Network' ? 'net' : (p.type === 'Virtual' ? 'virtual' : 'local')))" x-text="p.type"></span>
+                                </div>
+                                <div class="small text-muted" x-text="p.model"></div>
+                            </td>
+                            <td><span class="badge" x-text="p.brand || 'Generic'"></span></td>
+                            <td>
+                                <div x-text="p.building || 'N/A'"></div>
+                                <div class="small text-muted" x-text="p.department || 'N/A'"></div>
+                            </td>
+                            <td class="mono" x-text="p.ip || '-'"></td>
+                            <td>
+                                <div class="fw-bold" x-text="(p.total_pages_printed - p.starting_page_count) + ' pages'"></div>
+                                <div class="small text-muted" x-text="'Total: ' + p.total_pages_printed"></div>
+                            </td>
+                            <td x-text="p.last_ink ? formatDate(p.last_ink) : 'Never'"></td>
+                            <td>
+                                <div class="flex gap-1">
+                                    <button class="btn-sm" @click="updateInk(p.id)" title="Mark Ink Changed">💧 Ink</button>
+                                    <button class="btn-sm btn-outline" @click="openPrinterHistory(p)">📜 History</button>
+                                </div>
+                            </td>
+                        </tr>
+                    </template>
+                </tbody>
+            </table>
+        </div>
+    </div>
+</section>
+
+<!-- PRINTER HISTORY MODAL -->
+<div class="modal-overlay" x-show="showPrinterHistory" x-cloak @click.self="showPrinterHistory=false">
+    <div class="modal-box" style="max-width: 600px;">
+        <div class="modal-head">
+            <h3>📜 Maintenance History: <span x-text="selectedPrinter?.name"></span></h3>
+            <button class="modal-close" @click="showPrinterHistory=false">✕</button>
+        </div>
+        <div class="modal-body">
+            <div class="table-wrapper">
+                <table>
+                    <thead><tr><th>Date</th><th>Event</th><th>Description</th></tr></thead>
+                    <tbody>
+                        <template x-for="log in printerLogs" :key="log.id">
+                            <tr>
+                                <td class="small mono" x-text="formatDate(log.date)"></td>
+                                <td><span class="badge usb" x-text="log.type"></span></td>
+                                <td x-text="log.description"></td>
+                            </tr>
+                        </template>
+                        <tr x-show="!printerLogs.length"><td colspan="3" class="text-center py-4">No history recorded yet.</td></tr>
+                    </tbody>
+                </table>
+            </div>
+        </div>
+    </div>
+</div>
+
+<!-- ADD PRINTER MODAL -->
+<div class="modal-overlay" x-show="showAddPrinter" x-cloak @click.self="showAddPrinter=false">
+    <div class="modal-box" style="max-width: 500px;">
+        <div class="modal-head"><h3>➕ Add New Printer</h3><button class="modal-close" @click="showAddPrinter=false">✕</button></div>
+        <div class="modal-body">
+            <div class="mb-3">
+                <label class="small fw-bold">Printer Name</label>
+                <input type="text" class="search-input w-100" x-model="newPrinter.name" placeholder="e.g. IT-Laser-01">
+            </div>
+            <div class="detail-grid-2 mb-3">
+                <div>
+                    <label class="small fw-bold">Brand</label>
+                    <input type="text" class="search-input w-100" x-model="newPrinter.brand" placeholder="e.g. HP">
+                </div>
+                <div>
+                    <label class="small fw-bold">Model</label>
+                    <input type="text" class="search-input w-100" x-model="newPrinter.model" placeholder="e.g. LaserJet Pro">
+                </div>
+            </div>
+            <div class="detail-grid-2 mb-3">
+                <div>
+                    <label class="small fw-bold">IP Address</label>
+                    <input type="text" class="search-input w-100" x-model="newPrinter.ip" placeholder="192.168.1.100">
+                </div>
+                <div>
+                    <label class="small fw-bold">Type</label>
+                    <select class="search-input w-100" x-model="newPrinter.type">
+                        <option value="Laser">Laser</option>
+                        <option value="Inkjet">Inkjet</option>
+                        <option value="Thermal">Thermal</option>
+                    </select>
+                </div>
+            </div>
+            <button class="btn-primary w-100" @click="addPrinter()">💾 Save Printer</button>
+        </div>
+    </div>
+</div>

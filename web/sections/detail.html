@@ -1,0 +1,477 @@
+<!-- VIEW: DEVICE DETAIL -->
+<section x-show="view==='detail'" x-cloak>
+    <div class="detail-back-bar">
+        <button class="btn-outline" @click="switchView('devices')">← Back to List</button>
+        <button class="btn-danger" x-show="userRole === 'admin'" @click="deleteDevice(detailDevice?.uuid)">🗑️ Delete Device</button>
+        <button class="btn-primary ms-2" x-show="userRole === 'admin'" @click="openEditAssetModal()">📝 Edit Asset Info</button>
+        <div class="ms-auto fw-bold" x-text="detailDevice?.hostname"></div>
+    </div>
+
+    <template x-if="detailDevice && !detailDevice._loading">
+        <div>
+            <!-- Detail Header Stats -->
+            <div class="stats-row mb-4">
+                <div class="stat-card">
+                    <div class="stat-label">OS Version</div>
+                    <div class="stat-value small" x-text="detailDevice.os_info?.caption || detailDevice.os_info?.system"></div>
+                </div>
+                <div class="stat-card">
+                    <div class="stat-label">Uptime Status</div>
+                    <div class="stat-value small" :class="detailDevice.status==='ONLINE'?'text-success':'text-danger'" x-text="detailDevice.status"></div>
+                </div>
+                <div class="stat-card">
+                    <div class="stat-label">Last Check-in</div>
+                    <div class="stat-value small" x-text="formatDate(detailDevice.last_seen)"></div>
+                </div>
+            </div>
+
+            <!-- TABS NAVIGATION -->
+            <div class="tabs-bar mb-3">
+                <button class="tab-btn" :class="activeTab==='specs'?'active':''" @click="activeTab='specs'">🔍 Specs</button>
+                <button class="tab-btn" :class="activeTab==='software'?'active':''" @click="activeTab='software'">📦 Software (<span x-text="detailDevice.software?.length"></span>)</button>
+                <button class="tab-btn" :class="activeTab==='usb'?'active':''" @click="activeTab='usb'">🔌 USB History</button>
+                <button class="tab-btn" :class="activeTab==='logs'?'active':''" @click="activeTab='logs'">📜 Audit Logs</button>
+                <button class="tab-btn" :class="activeTab==='facts'?'active':''" @click="activeTab='facts'">🧾 Facts</button>
+            </div>
+
+            <!-- TAB: SPECS -->
+            <div x-show="activeTab==='specs'">
+                
+                <div class="detail-grid-2 mb-3">
+                    <div class="card">
+                        <div class="card-header"><h3 class="card-title">🧠 CPU</h3></div>
+                        <div class="p-4">
+                            <div class="detail-row"><div class="detail-label">Name</div><div class="detail-val fw-bold" x-text="detailDevice.hardware?.cpu?.name || '-'"></div></div>
+                            <div class="detail-row"><div class="detail-label">Cores/Threads</div><div class="detail-val" x-text="(detailDevice.hardware?.cpu?.cores || 0) + ' Cores / ' + (detailDevice.hardware?.cpu?.threads || 0) + ' Threads'"></div></div>
+                            <div class="detail-row"><div class="detail-label">Base Speed</div><div class="detail-val" x-text="(detailDevice.hardware?.cpu?.max_speed || 0) + ' MHz'"></div></div>
+                        </div>
+                    </div>
+                    
+                    <div class="card">
+                        <div class="card-header"><h3 class="card-title">💾 System Memory / Mobo</h3></div>
+                        <div class="p-4">
+                            <div class="detail-row">
+                                <div class="detail-label">Total RAM</div>
+                                <div class="detail-val fw-bold" x-text="Math.round((detailDevice.hardware?.ram || []).reduce((sum, r) => sum + r.capacity_gb, 0)) + ' GB'"></div>
+                            </div>
+                            <div class="detail-row"><div class="detail-label">Mobo Maker</div><div class="detail-val" x-text="detailDevice.hardware?.motherboard?.manufacturer || '-'"></div></div>
+                            <div class="detail-row"><div class="detail-label">Mobo Product</div><div class="detail-val" x-text="detailDevice.hardware?.motherboard?.product || '-'"></div></div>
+                        </div>
+                    </div>
+                </div>
+
+                <div class="card mb-3">
+                    <div class="card-header"><h3 class="card-title">🧩 RAM Slots Detail</h3></div>
+                    <div class="table-wrapper">
+                        <table class="small">
+                            <thead><tr><th>Slot</th><th>Capacity</th><th>Speed</th><th>Manufacturer</th><th>Part Number</th><th>Serial</th></tr></thead>
+                            <tbody>
+                                <template x-for="(r, i) in detailDevice.hardware?.ram" :key="i">
+                                    <tr>
+                                        <td class="fw-bold" x-text="'Slot ' + (i+1)"></td>
+                                        <td x-text="r.capacity_gb + ' GB'"></td>
+                                        <td x-text="r.speed + ' MHz'"></td>
+                                        <td x-text="r.manufacturer || '-'"></td>
+                                        <td class="mono" x-text="r.part_number || '-'"></td>
+                                        <td class="mono text-muted" x-text="r.serial || '-'"></td>
+                                    </tr>
+                                </template>
+                                <tr x-show="!detailDevice.hardware?.ram?.length"><td colspan="6" class="text-center py-2">No RAM data available.</td></tr>
+                            </tbody>
+                        </table>
+                    </div>
+                </div>
+
+                <div class="detail-grid-2 mb-3">
+                    <div class="card">
+                        <div class="card-header"><h3 class="card-title">🎮 Graphics (GPU)</h3></div>
+                        <div class="table-wrapper">
+                            <table>
+                                <thead><tr><th>Name</th><th>RAM</th><th>Driver</th></tr></thead>
+                                <tbody>
+                                    <template x-for="(g, i) in detailDevice.hardware?.gpu" :key="i">
+                                        <tr>
+                                            <td class="fw-bold" x-text="g.name"></td>
+                                            <td x-text="g.ram_mb + ' MB'"></td>
+                                            <td class="mono small" x-text="g.driver_version"></td>
+                                        </tr>
+                                    </template>
+                                    <tr x-show="!detailDevice.hardware?.gpu?.length"><td colspan="3" class="text-center py-2">No GPU found.</td></tr>
+                                </tbody>
+                            </table>
+                        </div>
+                    </div>
+                    
+                    <div class="card">
+                        <div class="card-header"><h3 class="card-title">🖨️ Connected Printers</h3></div>
+                        <div class="table-wrapper">
+                            <table>
+                                <thead><tr><th>Name</th><th>Model</th><th>Network</th></tr></thead>
+                                <tbody>
+                                    <template x-for="(p, i) in detailDevice.hardware?.printers" :key="i">
+                                        <tr>
+                                            <td class="fw-bold" x-text="p.name"></td>
+                                            <td x-text="p.model || '-'"></td>
+                                            <td><span class="badge" :class="p.network ? 'online' : 'usb'" x-text="p.network ? 'Network' : 'Local'"></span></td>
+                                        </tr>
+                                    </template>
+                                    <tr x-show="!detailDevice.hardware?.printers?.length"><td colspan="3" class="text-center py-2">No printers found.</td></tr>
+                                </tbody>
+                            </table>
+                        </div>
+                    </div>
+                </div>
+
+                <div class="card mb-3">
+                    <div class="card-header"><h3 class="card-title">💿 Physical Storage</h3></div>
+                    <div class="table-wrapper">
+                        <table>
+                            <thead><tr><th>Model</th><th>Size</th><th>Interface</th><th>Serial Number</th></tr></thead>
+                            <tbody>
+                                <template x-for="(disk, i) in detailDevice.hardware?.storage" :key="i">
+                                    <tr>
+                                        <td class="fw-bold" x-text="disk.model"></td>
+                                        <td x-text="disk.size_gb + ' GB'"></td>
+                                        <td x-text="disk.interface"></td>
+                                        <td class="mono small" x-text="disk.serial"></td>
+                                    </tr>
+                                </template>
+                            </tbody>
+                        </table>
+                    </div>
+                </div>
+            </div>
+
+            <!-- TAB: FACTS -->
+            <div x-show="activeTab==='facts'">
+                <div class="stats-row mb-4">
+                    <div class="stat-card">
+                        <div class="stat-label">Facts Updated</div>
+                        <div class="stat-value small" x-text="formatDate(detailDevice.facts_updated_at)"></div>
+                    </div>
+                    <div class="stat-card">
+                        <div class="stat-label">Hotfixes (KB)</div>
+                        <div class="stat-value small" x-text="detailDevice.facts?.hotfixes?.length || 0"></div>
+                    </div>
+                    <div class="stat-card">
+                        <div class="stat-label">Startup Items</div>
+                        <div class="stat-value small" x-text="detailDevice.facts?.startup_items?.length || 0"></div>
+                    </div>
+                </div>
+
+                <div class="card mb-4">
+                    <div class="card-header"><h3 class="card-title">🏢 Master Data (ข้อมูลคุมทรัพย์สิน)</h3></div>
+                    <div class="p-4">
+                        <div class="detail-grid-2">
+                            <div class="detail-row"><div class="detail-label">SKU / Asset Number</div><div class="detail-val fw-bold" x-text="detailDevice.master_data?.sku || '-'"></div></div>
+                            <div class="detail-row"><div class="detail-label">ICT Type</div><div class="detail-val" x-text="detailDevice.master_data?.type_ict || '-'"></div></div>
+                            <div class="detail-row"><div class="detail-label">Purchase Date</div><div class="detail-val" x-text="detailDevice.master_data?.purchase_date || '-'"></div></div>
+                            <div class="detail-row"><div class="detail-label">Warranty Expiry</div><div class="detail-val" x-text="detailDevice.master_data?.warranty_expire || '-'"></div></div>
+                            <div class="detail-row"><div class="detail-label">Warranty (Months)</div><div class="detail-val" x-text="detailDevice.master_data?.warranty_months || 0"></div></div>
+                            <div class="detail-row"><div class="detail-label">Price (Amount)</div><div class="detail-val text-success" x-text="detailDevice.master_data?.amount ? parseFloat(detailDevice.master_data.amount).toLocaleString('th-TH') + ' ฿' : '-'"></div></div>
+                            <div class="detail-row" style="grid-column: 1 / -1;"><div class="detail-label">Comments</div><div class="detail-val" x-text="detailDevice.master_data?.comment || '-'"></div></div>
+                        </div>
+                    </div>
+                </div>
+
+                <div class="detail-grid-2 mb-3">
+                    <div class="card">
+                        <div class="card-header"><h3 class="card-title">🛡️ Microsoft Defender</h3></div>
+                        <div class="p-4">
+                            <div class="detail-row"><div class="detail-label">Realtime</div><div class="detail-val" x-text="detailDevice.facts?.defender?.realtime_protection_enabled ? 'Enabled' : 'Disabled/Unknown'"></div></div>
+                            <div class="detail-row"><div class="detail-label">Antivirus</div><div class="detail-val" x-text="detailDevice.facts?.defender?.antivirus_enabled ? 'Enabled' : 'Disabled/Unknown'"></div></div>
+                            <div class="detail-row"><div class="detail-label">Sig Version</div><div class="detail-val mono" x-text="detailDevice.facts?.defender?.antivirus_signature_version || '-'"></div></div>
+                            <div class="detail-row"><div class="detail-label">Sig Updated</div><div class="detail-val" x-text="detailDevice.facts?.defender?.antivirus_signature_last_updated || '-'"></div></div>
+                            <div class="detail-row"><div class="detail-label">Quick Scan Age</div><div class="detail-val" x-text="(detailDevice.facts?.defender?.quick_scan_age_days ?? '-') + ' day(s)'"></div></div>
+                            <div class="detail-row"><div class="detail-label">Full Scan Age</div><div class="detail-val" x-text="(detailDevice.facts?.defender?.full_scan_age_days ?? '-') + ' day(s)'"></div></div>
+                        </div>
+                    </div>
+
+                    <div class="card">
+                        <div class="card-header"><h3 class="card-title">📶 Network / Wi‑Fi</h3></div>
+                        <div class="p-4">
+                            <div class="detail-row"><div class="detail-label">Connection</div><div class="detail-val" x-text="detailDevice.os_info?.connection_type || '-'"></div></div>
+                            <div class="detail-row"><div class="detail-label">Wi‑Fi SSID</div><div class="detail-val mono" x-text="detailDevice.os_info?.wifi_ssid || '-'"></div></div>
+                            <div class="detail-row"><div class="detail-label">Wi‑Fi State</div><div class="detail-val" x-text="detailDevice.facts?.wifi?.state || '-'"></div></div>
+                            <div class="detail-row"><div class="detail-label">Signal</div><div class="detail-val" x-text="detailDevice.facts?.wifi?.signal || '-'"></div></div>
+                            <div class="detail-row"><div class="detail-label">Adapters</div><div class="detail-val" x-text="detailDevice.facts?.network_adapters?.length || 0"></div></div>
+                        </div>
+                    </div>
+                </div>
+
+                <div class="detail-grid-2 mb-3">
+                    <div class="card">
+                        <div class="card-header"><h3 class="card-title">💽 SMART (Predict Failure)</h3></div>
+                        <div class="p-4">
+                            <div class="detail-row">
+                                <div class="detail-label">Total</div>
+                                <div class="detail-val" x-text="detailDevice.facts?.smart?.length || 0"></div>
+                            </div>
+                            <div class="detail-row">
+                                <div class="detail-label">Predict Failure</div>
+                                <div class="detail-val text-danger" x-text="(detailDevice.facts?.smart?.filter(s => s.predict_failure)?.length) || 0"></div>
+                            </div>
+                        </div>
+                    </div>
+
+                    <div class="card">
+                        <div class="card-header"><h3 class="card-title">👤 Logged-on Users</h3></div>
+                        <div class="table-wrapper">
+                            <table class="small">
+                                <thead><tr><th>User</th></tr></thead>
+                                <tbody>
+                                    <template x-for="(u, i) in (detailDevice.facts?.logged_on_users || [])" :key="i">
+                                        <tr><td class="mono" x-text="u.username || '-'"></td></tr>
+                                    </template>
+                                    <tr x-show="(detailDevice.facts?.logged_on_users || []).length === 0"><td class="empty-row">No data</td></tr>
+                                </tbody>
+                            </table>
+                        </div>
+                    </div>
+                </div>
+
+                <div class="card mb-3">
+                    <div class="card-header"><h3 class="card-title">🧩 Startup Items (Top 30)</h3></div>
+                    <div class="table-wrapper">
+                        <table class="small">
+                            <thead><tr><th>Scope</th><th>Name</th><th>Command</th></tr></thead>
+                            <tbody>
+                                <template x-for="(s, i) in (detailDevice.facts?.startup_items || []).slice(0, 30)" :key="i">
+                                    <tr>
+                                        <td x-text="s.scope || '-'"></td>
+                                        <td class="mono" x-text="s.name || '-'"></td>
+                                        <td class="mono" x-text="s.command || '-'"></td>
+                                    </tr>
+                                </template>
+                                <tr x-show="(detailDevice.facts?.startup_items || []).length === 0"><td class="empty-row" colspan="3">No data</td></tr>
+                            </tbody>
+                        </table>
+                    </div>
+                </div>
+
+                <div class="card mb-3">
+                    <div class="card-header"><h3 class="card-title">🧷 Windows Hotfixes (Top 30)</h3></div>
+                    <div class="table-wrapper">
+                        <table class="small">
+                            <thead><tr><th>KB</th><th>Description</th><th>Installed On</th><th>Installed By</th></tr></thead>
+                            <tbody>
+                                <template x-for="(h, i) in (detailDevice.facts?.hotfixes || []).slice(0, 30)" :key="i">
+                                    <tr>
+                                        <td class="mono" x-text="h.kb || '-'"></td>
+                                        <td x-text="h.description || '-'"></td>
+                                        <td x-text="h.installed_on || '-'"></td>
+                                        <td class="mono" x-text="h.installed_by || '-'"></td>
+                                    </tr>
+                                </template>
+                                <tr x-show="(detailDevice.facts?.hotfixes || []).length === 0"><td class="empty-row" colspan="4">No data</td></tr>
+                            </tbody>
+                        </table>
+                    </div>
+                </div>
+
+                <div class="card">
+                    <div class="card-header"><h3 class="card-title">🧰 Services (Top 50)</h3></div>
+                    <div class="table-wrapper">
+                        <table class="small">
+                            <thead><tr><th>Name</th><th>State</th><th>Start</th><th>Path</th></tr></thead>
+                            <tbody>
+                                <template x-for="(sv, i) in (detailDevice.facts?.services || []).slice(0, 50)" :key="i">
+                                    <tr>
+                                        <td class="mono" x-text="sv.name || '-'"></td>
+                                        <td x-text="sv.state || '-'"></td>
+                                        <td x-text="sv.start_mode || '-'"></td>
+                                        <td class="mono" x-text="sv.path || '-'"></td>
+                                    </tr>
+                                </template>
+                                <tr x-show="(detailDevice.facts?.services || []).length === 0"><td class="empty-row" colspan="4">No data</td></tr>
+                            </tbody>
+                        </table>
+                    </div>
+                </div>
+
+            </div>
+
+            <!-- TAB: SOFTWARE -->
+            <div x-show="activeTab==='software'">
+                <div class="card">
+                    <div class="table-wrapper" style="max-height: 500px;">
+                        <table>
+                            <thead><tr><th>Program Name</th><th>Version</th><th>Status</th></tr></thead>
+                            <tbody>
+                                <template x-for="sw in detailDevice.software" :key="sw.name">
+                                    <tr :class="sw.is_blacklisted ? 'bg-danger-subtle' : ''">
+                                        <td class="fw-bold" :class="sw.is_blacklisted ? 'text-danger' : ''" x-text="sw.name"></td>
+                                        <td class="mono small" x-text="sw.version"></td>
+                                        <td>
+                                            <span x-show="sw.is_blacklisted" class="badge danger">BLACKLISTED</span>
+                                            <span x-show="!sw.is_blacklisted" class="badge online">Safe</span>
+                                        </td>
+                                    </tr>
+                                </template>
+                            </tbody>
+                        </table>
+                    </div>
+                </div>
+            </div>
+
+            <!-- TAB: USB -->
+            <div x-show="activeTab==='usb'">
+                <div class="card">
+                    <div class="table-wrapper">
+                        <table>
+                            <thead><tr><th>Device Name</th><th>Type</th><th>First Detected</th></tr></thead>
+                            <tbody>
+                                <template x-for="u in detailDevice.usb" :key="u.id">
+                                    <tr>
+                                        <td class="fw-bold" x-text="u.name"></td>
+                                        <td><span class="badge usb" x-text="u.type"></span></td>
+                                        <td class="small text-muted" x-text="formatDate(u.date)"></td>
+                                    </tr>
+                                </template>
+                                <tr x-show="!detailDevice.usb?.length"><td colspan="3" class="text-center py-4">No USB devices detected.</td></tr>
+                            </tbody>
+                        </table>
+                    </div>
+                </div>
+            </div>
+
+            <!-- TAB: LOGS -->
+            <div x-show="activeTab==='logs'">
+                <div class="card">
+                    <div class="table-wrapper">
+                        <table>
+                            <thead><tr><th>Date</th><th>Type</th><th>Change Detail</th></tr></thead>
+                            <tbody>
+                                <template x-for="log in detailDevice.logs" :key="log.id">
+                                    <tr>
+                                        <td class="small mono" x-text="formatDate(log.date)"></td>
+                                        <td><span class="badge" :class="log.type==='SOFTWARE'?'software':'hardware'" x-text="log.type"></span></td>
+                                        <td>
+                                            <span class="text-muted" x-text="log.field + ': '"></span>
+                                            <span class="fw-bold" x-text="log.new"></span>
+                                        </td>
+                                    </tr>
+                                </template>
+                                <tr x-show="!detailDevice.logs?.length"><td colspan="3" class="text-center py-4">No activity logs found.</td></tr>
+                            </tbody>
+                        </table>
+                    </div>
+                </div>
+                <div class="card">
+                    <div class="table-wrapper" style="max-height: 500px;">
+                        <table>
+                            <thead><tr><th>Program Name</th><th>Version</th><th>Status</th></tr></thead>
+                            <tbody>
+                                <template x-for="sw in detailDevice.software" :key="sw.name">
+                                    <tr :class="sw.is_blacklisted ? 'bg-danger-subtle' : ''">
+                                        <td class="fw-bold" :class="sw.is_blacklisted ? 'text-danger' : ''" x-text="sw.name"></td>
+                                        <td class="mono small" x-text="sw.version"></td>
+                                        <td>
+                                            <span x-show="sw.is_blacklisted" class="badge danger">BLACKLISTED</span>
+                                            <span x-show="!sw.is_blacklisted" class="badge online">Safe</span>
+                                        </td>
+                                    </tr>
+                                </template>
+                            </tbody>
+                        </table>
+                    </div>
+                </div>
+            </div>
+
+            <!-- TAB: USB -->
+            <div x-show="activeTab==='usb'">
+                <div class="card">
+                    <div class="table-wrapper">
+                        <table>
+                            <thead><tr><th>Device Name</th><th>Type</th><th>First Detected</th></tr></thead>
+                            <tbody>
+                                <template x-for="u in detailDevice.usb" :key="u.id">
+                                    <tr>
+                                        <td class="fw-bold" x-text="u.name"></td>
+                                        <td><span class="badge usb" x-text="u.type"></span></td>
+                                        <td class="small text-muted" x-text="formatDate(u.date)"></td>
+                                    </tr>
+                                </template>
+                                <tr x-show="!detailDevice.usb?.length"><td colspan="3" class="text-center py-4">No USB devices detected.</td></tr>
+                            </tbody>
+                        </table>
+                    </div>
+                </div>
+            </div>
+
+            <!-- TAB: LOGS -->
+            <div x-show="activeTab==='logs'">
+                <div class="card">
+                    <div class="table-wrapper">
+                        <table>
+                            <thead><tr><th>Date</th><th>Type</th><th>Change Detail</th></tr></thead>
+                            <tbody>
+                                <template x-for="log in detailDevice.logs" :key="log.id">
+                                    <tr>
+                                        <td class="small mono" x-text="formatDate(log.date)"></td>
+                                        <td><span class="badge" :class="log.type==='SOFTWARE'?'software':'hardware'" x-text="log.type"></span></td>
+                                        <td>
+                                            <span class="text-muted" x-text="log.field + ': '"></span>
+                                            <span class="fw-bold" x-text="log.new"></span>
+                                        </td>
+                                    </tr>
+                                </template>
+                                <tr x-show="!detailDevice.logs?.length"><td colspan="3" class="text-center py-4">No activity logs found.</td></tr>
+                            </tbody>
+                        </table>
+                    </div>
+                </div>
+            </div>
+
+        </div>
+    </template>
+
+    <div class="text-center py-5" x-show="detailDevice?._loading">
+        <div class="spinner mx-auto mb-3"></div>
+        <p>Loading device details...</p>
+    </div>
+
+    <!-- Edit Asset Modal -->
+    <div class="modal-overlay" x-show="showEditAssetModal" x-transition.opacity x-cloak>
+        <div class="modal-content" @click.away="showEditAssetModal=false">
+            <div class="modal-header">
+                <h2>📝 Edit Asset Info</h2>
+                <button class="close-btn" @click="showEditAssetModal=false">✕</button>
+            </div>
+            <div class="modal-body">
+                <div class="form-group">
+                    <label>SKU / Asset Number</label>
+                    <input type="text" class="form-control" x-model="editAssetForm.sku" placeholder="ex. COM-001">
+                </div>
+                <div class="form-group">
+                    <label>ICT Type (ประเภทตามเกณฑ์)</label>
+                    <input type="text" class="form-control" x-model="editAssetForm.type_ict">
+                </div>
+                <div class="form-group">
+                    <label>Purchase Date</label>
+                    <input type="date" class="form-control" x-model="editAssetForm.purchase_date">
+                </div>
+                <div class="form-group">
+                    <label>Warranty Expiry</label>
+                    <input type="date" class="form-control" x-model="editAssetForm.warranty_expire">
+                </div>
+                <div class="form-group">
+                    <label>Warranty Duration (Months)</label>
+                    <input type="number" class="form-control" x-model="editAssetForm.warranty_months">
+                </div>
+                <div class="form-group">
+                    <label>Price (Amount)</label>
+                    <input type="number" step="0.01" class="form-control" x-model="editAssetForm.amount">
+                </div>
+                <div class="form-group">
+                    <label>Comments / Notes</label>
+                    <textarea class="form-control" rows="3" x-model="editAssetForm.comment"></textarea>
+                </div>
+            </div>
+            <div class="modal-footer">
+                <button class="btn-outline" @click="showEditAssetModal=false">Cancel</button>
+                <button class="btn-primary" @click="saveAssetInfo()" :disabled="loading">💾 Save Changes</button>
+            </div>
+        </div>
+    </div>
+</section>

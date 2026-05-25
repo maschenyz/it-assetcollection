@@ -1,0 +1,63 @@
+<nav class="sidebar">
+    <div class="logo">
+        <span class="logo-icon-sm">💠</span>
+        <span class="logo-text">Yuna Asset</span>
+    </div>
+    
+    <div class="nav-group">Main</div>
+    <ul class="nav-links">
+        <li class="nav-item" :class="view==='dashboard'?'active':''" @click="switchView('dashboard')">
+            <span class="nav-icon">📊</span><span>Overview</span>
+        </li>
+    </ul>
+
+    <div class="nav-group">Inventory</div>
+    <ul class="nav-links">
+        <li class="nav-item" :class="view==='devices'||view==='detail'?'active':''" @click="switchView('devices')">
+            <span class="nav-icon">💻</span><span>Computers</span>
+        </li>
+        <li class="nav-item" :class="view==='software'?'active':''" @click="switchView('software')">
+            <span class="nav-icon">📦</span><span>Software</span>
+        </li>
+        <li class="nav-item" :class="view==='printers'?'active':''" @click="switchView('printers')">
+            <span class="nav-icon">🖨️</span><span>Printers</span>
+        </li>
+    </ul>
+
+    <div class="nav-group">Admin Tools</div>
+    <ul class="nav-links">
+        <li class="nav-item" :class="view==='live'?'active':''" @click="switchView('live')">
+            <span class="nav-icon">⚡</span><span>Live Control</span>
+        </li>
+        <li class="nav-item" :class="view==='logs'?'active':''" @click="switchView('logs')">
+            <span class="nav-icon">📜</span><span>Change Logs</span>
+        </li>
+        <li class="nav-item" :class="view==='screenshots'?'active':''" @click="switchView('screenshots')">
+            <span class="nav-icon">📸</span><span>Screenshots</span>
+        </li>
+        <li class="nav-item" :class="view==='blacklist'?'active':''" @click="switchView('blacklist')">
+            <span class="nav-icon">🚫</span><span>Blacklist</span>
+        </li>
+        <li class="nav-item" :class="view==='master'?'active':''" @click="switchView('master')">
+            <span class="nav-icon">🏢</span><span>Master Data</span>
+        </li>
+        <li class="nav-item" :class="view==='reports'?'active':''" @click="switchView('reports')">
+            <span class="nav-icon">📊</span><span>Reports</span>
+        </li>
+    </ul>
+
+    <div class="nav-group">System</div>
+    <ul class="nav-links">
+        <li class="nav-item" :class="view==='settings'?'active':''" @click="switchView('settings')">
+            <span class="nav-icon">⚙️</span><span>Settings</span>
+        </li>
+    </ul>
+
+    <div class="sidebar-footer">
+        <div class="status-dot-row">
+            <span class="status-dot" :class="connected?'online':'offline'"></span>
+            <span class="status-text" x-text="connected?'Connected':'Offline'"></span>
+        </div>
+        <button class="logout-btn" @click="logout()">↩ Logout</button>
+    </div>
+</nav>

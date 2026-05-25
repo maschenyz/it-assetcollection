@@ -1,0 +1,24 @@
+<!-- VIEW: SCREENSHOTS -->
+<section x-show="view==='screenshots'" x-cloak>
+    <div class="card">
+        <div class="card-header">
+            <h3 class="card-title">Recent Captures</h3>
+            <button class="btn-outline" @click="loadScreenshots()">🔄 Refresh</button>
+        </div>
+        <div class="p-4">
+            <div class="screenshot-grid">
+                <template x-for="s in screenshots" :key="s.id">
+                    <div class="screenshot-item" @click="viewFullImage(s.id)">
+                        <div class="screenshot-thumb">
+                            <img :src="'/api/v1/screenshots/'+s.id">
+                        </div>
+                        <div class="screenshot-meta">
+                            <div class="fw-bold" x-text="s.hostname"></div>
+                            <div class="small text-muted" x-text="formatDate(s.created_at)"></div>
+                        </div>
+                    </div>
+                </template>
+            </div>
+        </div>
+    </div>
+</section>
