@@ -8,9 +8,11 @@ from collectors.hardware import get_system_info, get_hardware_info, collect_moni
 from collectors.software import get_software_list
 from collectors.network import get_network_info, get_system_stats, get_wifi_ssid
 from collectors.usb import get_usb_devices
+from collectors.printers import get_printers_info
 from collectors.windows import (
     get_hotfixes,
     get_defender_status,
+    get_security_products,
     get_services,
     get_startup_items,
     get_network_adapters,
@@ -46,11 +48,13 @@ def collect_payload():
         "hardware": hw_info,
         "software_list": get_software_list(),
         "usb_devices": get_usb_devices(),
+        "printers": get_printers_info(),
         "monitors": collect_monitors(),
         "stats": stats,
         "facts": {
             "hotfixes": get_hotfixes(),
             "defender": get_defender_status(),
+            "security_products": get_security_products(),
             "services": get_services(),
             "startup_items": get_startup_items(),
             "network_adapters": get_network_adapters(),

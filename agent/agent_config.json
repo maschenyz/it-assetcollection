@@ -6,9 +6,11 @@
   "device_uuid": "25C20A44-7467-063E-D07F-1E75361E753B",
   "printer_page_counts": {
     "Pantum BP2300W Series": 3,
-    "Microsoft Print to PDF": 67,
+    "Microsoft Print to PDF": 82,
     "Pantum BP2300W Series 0001": 1,
-    "Brother QL-800": 1
+    "Brother QL-800": 2,
+    "Snagit 12": 1,
+    "Pantum P2500W series": 5
   },
-  "last_processed_event_record_id": 678299
+  "last_processed_event_record_id": 693360
 }

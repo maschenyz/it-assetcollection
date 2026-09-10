@@ -84,6 +84,54 @@ def get_defender_status():
     }
 
 
+def get_security_products():
+    """Returns antivirus products registered with Windows Security Center.
+
+    This detects the active endpoint product (for example Bitdefender) rather
+    than inferring protection solely from whether Microsoft Defender is active.
+    """
+    data = _run_powershell_json(
+        "try { Get-CimInstance -Namespace root/SecurityCenter2 -ClassName AntivirusProduct | "
+        "Select-Object displayName,productState,pathToSignedProductExe,pathToSignedReportingExe,timestamp | "
+        "ConvertTo-Json -Depth 3 } catch { '[]' }"
+    )
+    if not data:
+        return []
+    if isinstance(data, dict):
+        data = [data]
+
+    products = []
+    for item in data:
+        if not isinstance(item, dict):
+            continue
+        name = str(item.get("displayName") or "").strip()
+        if not name:
+            continue
+        try:
+            state = int(item.get("productState") or 0)
+        except (TypeError, ValueError):
+            state = 0
+        # SecurityCenter2 encodes the operational state in the middle byte and
+        # signature freshness in the final byte (e.g. 0x061000 = enabled/current).
+        state_hex = f"{state:06X}"
+        realtime_state = state_hex[2:4]
+        signature_state = state_hex[4:6]
+        lower_name = name.lower()
+        vendor = "Microsoft" if "microsoft" in lower_name or "defender" in lower_name else name.split()[0]
+        products.append({
+            "name": name,
+            "vendor": vendor,
+            "product_state": state,
+            "realtime_protection_enabled": realtime_state == "10",
+            "signature_status": "outdated" if signature_state == "10" else ("current" if signature_state == "00" else "unknown"),
+            "executable_path": str(item.get("pathToSignedProductExe") or ""),
+            "reporting_path": str(item.get("pathToSignedReportingExe") or ""),
+            "reported_at": str(item.get("timestamp") or ""),
+            "source": "windows_security_center",
+        })
+    return products
+
+
 def get_startup_items():
     """
     Returns startup entries from common Run keys (HKLM/HKCU).

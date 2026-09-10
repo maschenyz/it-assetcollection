@@ -4,7 +4,7 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>Yuna Asset | Premium Dashboard</title>
+    <title>Cha-am Hospital IT-Asset Management</title>
     <link href="https://fonts.googleapis.com/css2?family=Nunito:wght@300;400;600;700;800&display=swap" rel="stylesheet">
     <link rel="stylesheet" href="/style.css">
     <script defer src="https://cdn.jsdelivr.net/npm/alpinejs@3.x.x/dist/cdn.min.js"></script>
@@ -70,20 +70,19 @@
             'modal-image',
         ];
 
-        sections.forEach(name => {
-            fetch(`sections/${name}.html?v=` + new Date().getTime())
+        Promise.all(sections.map(name => {
+            return fetch(`sections/${name}.html?v=` + new Date().getTime())
                 .then(r => r.text())
                 .then(html => {
                     const el = document.getElementById(`section-${name}`);
                     if (!el) return;
                     el.innerHTML = html;
-                    // Alpine doesn't automatically initialize dynamically injected HTML
-                    if (window.Alpine && typeof window.Alpine.initTree === 'function') {
+                    if (window.Alpine && window.Alpine.initTree) {
                         window.Alpine.initTree(el);
                     }
                 })
                 .catch(err => console.warn(`Could not load section: ${name}`, err));
-        });
+        }));
 
     </script>
 </body>

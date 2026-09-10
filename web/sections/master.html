@@ -13,14 +13,73 @@
             <div class="hw-card-title">Buildings List</div>
             <div class="table-wrapper">
                 <table>
-                    <thead><tr><th>Name</th><th>Code</th></tr></thead>
+                    <thead><tr><th>Name</th><th>Code</th><th></th></tr></thead>
                     <tbody>
                         <template x-for="b in buildings" :key="b.id">
-                            <tr><td class="fw-bold" x-text="b.name"></td><td class="mono" x-text="b.code"></td></tr>
+                            <tr><td class="fw-bold" x-text="b.name"></td><td class="mono" x-text="b.code"></td><td><button class="btn-sm btn-outline" @click="deleteMasterItem('buildings', b.id, b.name)">Delete</button></td></tr>
                         </template>
                     </tbody>
                 </table>
             </div>
+        </div>
+    </div>
+
+    <div class="detail-grid-3 mt-3">
+        <div class="hw-card">
+            <div class="hw-card-title">Add Department</div>
+            <div class="p-2">
+                <select class="search-input w-100 mb-2" x-model="newDepartment.building_id">
+                    <option value="">-- Building (optional) --</option>
+                    <template x-for="building in buildings" :key="building.id"><option :value="building.id" x-text="building.name"></option></template>
+                </select>
+                <input type="text" class="search-input w-100 mb-2" placeholder="Department Name" x-model="newDepartment.name">
+                <input type="text" class="search-input w-100 mb-2" placeholder="Code (optional)" x-model="newDepartment.code">
+                <button class="btn-primary w-100" @click="addDepartment()">Save</button>
+            </div>
+        </div>
+        <div class="hw-card" style="grid-column: span 2;">
+            <div class="hw-card-title">Departments List</div>
+            <div class="table-wrapper"><table>
+                <thead><tr><th>Department</th><th>Building</th><th>Code</th><th></th></tr></thead>
+                <tbody>
+                    <template x-for="dept in departments" :key="dept.id"><tr>
+                        <td class="fw-bold" x-text="dept.name"></td><td x-text="dept.building_name || '-'"></td><td class="mono" x-text="dept.code"></td>
+                        <td><button class="btn-sm btn-outline" @click="deleteMasterItem('departments', dept.id, dept.name)">Delete</button></td>
+                    </tr></template>
+                    <tr x-show="!departments.length"><td colspan="4" class="text-center py-3">No departments yet</td></tr>
+                </tbody>
+            </table></div>
+        </div>
+    </div>
+
+    <div class="detail-grid-3 mt-3">
+        <div class="hw-card">
+            <div class="hw-card-title">Add Location</div>
+            <div class="p-2">
+                <select class="search-input w-100 mb-2" x-model="newLocation.building_id">
+                    <option value="">-- Building (optional) --</option>
+                    <template x-for="building in buildings" :key="building.id"><option :value="building.id" x-text="building.name"></option></template>
+                </select>
+                <select class="search-input w-100 mb-2" x-model="newLocation.department_id">
+                    <option value="">-- Department (optional) --</option>
+                    <template x-for="dept in departments" :key="dept.id"><option :value="dept.id" x-text="`${dept.building_name ? dept.building_name + ' - ' : ''}${dept.name}`"></option></template>
+                </select>
+                <input type="text" class="search-input w-100 mb-2" placeholder="Room / point of installation" x-model="newLocation.room">
+                <button class="btn-primary w-100" @click="addLocation()">Save</button>
+            </div>
+        </div>
+        <div class="hw-card" style="grid-column: span 2;">
+            <div class="hw-card-title">Locations Used in Asset Dropdown</div>
+            <div class="table-wrapper"><table>
+                <thead><tr><th>Building</th><th>Department</th><th>Room / Point</th><th></th></tr></thead>
+                <tbody>
+                    <template x-for="location in locations" :key="location.id"><tr>
+                        <td x-text="location.building_name"></td><td x-text="location.department_name"></td><td x-text="location.room || '-'"></td>
+                        <td><button class="btn-sm btn-outline" @click="deleteMasterItem('locations', location.id, location.label)">Delete</button></td>
+                    </tr></template>
+                    <tr x-show="!locations.length"><td colspan="4" class="text-center py-3">Add a location to make it available in Asset Info.</td></tr>
+                </tbody>
+            </table></div>
         </div>
     </div>
 </section>

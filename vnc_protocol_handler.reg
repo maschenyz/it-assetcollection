@@ -1,0 +1,18 @@
+Windows Registry Editor Version 5.00
+
+; ==============================================================================
+; Yuna Asset Management — Custom VNC Protocol Handler
+; Registers the "vnc://" URI scheme in Windows.
+; Double-click this file to apply. Requires Administrator rights.
+; ==============================================================================
+
+[HKEY_CLASSES_ROOT\vnc]
+@="URL:VNC Connection Protocol"
+"URL Protocol"=""
+
+[HKEY_CLASSES_ROOT\vnc\shell]
+
+[HKEY_CLASSES_ROOT\vnc\shell\open]
+
+[HKEY_CLASSES_ROOT\vnc\shell\open\command]
+@="powershell.exe -WindowStyle Hidden -Command \"$url = '%1'; $ip = ($url -replace '^vnc:\\/\\/', '') -replace '\\/$', ''; Set-Clipboard -Value $ip; Start-Process 'C:\Program Files\RealVNC\VNC4\vncviewer.exe' -ArgumentList $ip\""

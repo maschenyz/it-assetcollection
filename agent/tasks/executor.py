@@ -1,10 +1,12 @@
 import subprocess
+import json
 import requests
 import base64
 from io import BytesIO
 from PIL import ImageGrab
 from core.config import load_config
 from collectors.base import get_hw_uuid
+from collectors.processes import get_running_processes, kill_process_by_pid
 from core import logger
 
 # Backup mapping for symbolic command names just in case the server fails to resolve them (Defense in depth)
@@ -19,6 +21,9 @@ SYMBOLIC_MAP = {
     "flush_dns": "ipconfig /flushdns",
     "check_disk": "chkdsk C: /scan"
 }
+
+# Commands handled internally (not passed to shell)
+INTERNAL_COMMANDS = {"screenshot", "get_processes", "scan_network"}
 
 def take_screenshot(task_id):
     config = load_config()
@@ -45,25 +50,53 @@ def execute_command(task_id, script):
     
     # Clean the script identifier/content
     script = script.strip() if script else ""
+    script_lower = script.lower()
     
     # Check for defense in depth mapping
     if script in SYMBOLIC_MAP:
         logger.info("Executor", f"Mapping symbolic command '{script}' to standard Windows script: '{SYMBOLIC_MAP[script]}'")
         script = SYMBOLIC_MAP[script]
+    elif script_lower in SYMBOLIC_MAP:
+        logger.info("Executor", f"Mapping symbolic command '{script_lower}' to standard Windows script: '{SYMBOLIC_MAP[script_lower]}'")
+        script = SYMBOLIC_MAP[script_lower]
 
     logger.info("Executor", f"Executing task {task_id}: {script}")
     result = ""
     status = "success"
     
     try:
-        if script == "screenshot":
+        if script_lower == "screenshot":
             result = take_screenshot(task_id)
-        elif script == "scan_network":
+            if "error" in result.lower():
+                status = "failed"
+
+        elif script_lower == "get_processes":
+            # Collect running processes and foreground window
+            logger.info("Executor", f"Collecting process list for task {task_id}...")
+            proc_data = get_running_processes(top_n=20)
+            result = json.dumps(proc_data, ensure_ascii=False)
+            logger.info("Executor", f"Process list collected: {len(proc_data.get('processes', []))} processes")
+
+        elif script_lower.startswith("kill_process:"):
+            # Kill a process by PID — format: "kill_process:1234"
+            try:
+                pid = int(script.split(":", 1)[1].strip())
+                success, msg = kill_process_by_pid(pid)
+                result = msg
+                status = "success" if success else "failed"
+                logger.info("Executor", f"Kill PID {pid}: {msg}")
+            except (ValueError, IndexError):
+                result = f"Invalid kill_process command format: '{script}'"
+                status = "failed"
+                logger.error("Executor", result)
+
+        elif script_lower == "scan_network":
             result = "Network scan logic not implemented yet"
             logger.info("Executor", "Network scan logic requested but not implemented yet")
+
         else:
             # Run Windows command line
-            res = subprocess.run(script, shell=True, capture_output=True, text=True)
+            res = subprocess.run(script, shell=True, capture_output=True, text=True, timeout=60)
             result = (res.stdout or "") + (res.stderr or "")
             if res.returncode != 0:
                 status = "failed"

@@ -1,0 +1,23 @@
+dashboard
+Username: admin
+Password: iydcidr
+
+run
+agent
+cd "c:\project A\agent"
+python agent.py
+
+server
+C:\project A>cd server
+
+C:\project A\server>go run main.go
+
+
+2. 🤖 คำสั่งโต้ตอบผ่าน Telegram Bot (Interactive Commands)
+พี่แบงค์สามารถพิมพ์คำสั่งหา Telegram Bot ใน Chat หรือ Group ได้ทันทีเลยค่ะ:
+
+📊 /status — ยูนะจะสรุปจำนวนคอมพิวเตอร์ทั้งหมด (Online / Offline), เครื่องพิมพ์ และรายการ Blacklist ให้แบบ Executive Summary
+🚨 /audit — ดึง Log การแจ้งเตือนและประวัติเปลี่ยนแปลงล่าสุด 5 รายการย้อนหลัง
+💻 /list — แสดงรายชื่อคอมพิวเตอร์ 10 เครื่องล่าสุด พร้อมสถานะไฟ (🟢/🔴), IP Address และผู้ใช้งาน
+❓ /help / /start — แสดงเมนูช่วยเหลือและแนะนำการใช้งานสไตล์ Yuna
+

@@ -1,18 +1,116 @@
 <!-- VIEW: LIVE CONTROL -->
 <section x-show="view==='live'" x-cloak>
-    <div class="live-grid">
-        <template x-for="dev in devices.filter(d=>d.status==='ONLINE')" :key="dev.uuid">
-            <div class="live-card">
-                <div class="live-card-top">
-                    <div class="fw-bold" x-text="dev.hostname"></div>
-                    <span class="badge online ms-auto">ONLINE</span>
-                </div>
-                <div class="live-actions">
-                    <button class="cmd-btn blue" @click="sendCommand(dev.uuid, 'screenshot', 'Capture')">📸 Screen</button>
-                    <button class="cmd-btn yellow" @click="sendCommand(dev.uuid, 'lock_screen', 'Lock')">🔒 Lock</button>
-                    <button class="cmd-btn red" @click="sendCommand(dev.uuid, 'restart_now', 'Restart')">🔄 Boot</button>
+    <!-- Header & Summary ribbon -->
+    <div class="card mb-4">
+        <div class="card-header" style="display: flex; justify-content: space-between; align-items: center; flex-wrap: wrap; gap: 12px;">
+            <div style="display: flex; align-items: center; gap: 12px;">
+                <h3 class="card-title">⚡ Live Control & Command Center</h3>
+                <span class="badge online">🟢 <span x-text="devices.filter(d=>d.status==='ONLINE').length"></span> Online Nodes</span>
+            </div>
+            <div style="display: flex; gap: 8px; align-items: center;">
+                <button class="btn-sm btn-outline" @click="loadRecentTasks()">🔄 Refresh Feed</button>
+            </div>
+        </div>
+        
+        <!-- Online Nodes Cards -->
+        <div class="p-4">
+            <h4 class="fw-bold mb-3 small text-muted" style="text-transform: uppercase; letter-spacing: 0.5px;">Active Workstations</h4>
+            <div class="live-grid mb-4">
+                <template x-for="dev in devices.filter(d=>d.status==='ONLINE')" :key="dev.uuid">
+                    <div class="live-card">
+                        <div class="live-card-top">
+                            <div>
+                                <div class="fw-bold" x-text="dev.hostname"></div>
+                                <div class="mono small text-muted" x-text="dev.ip_address"></div>
+                            </div>
+                            <span class="badge online">ONLINE</span>
+                        </div>
+                        <div class="live-actions">
+                            <button class="cmd-btn blue" @click="sendCommand(dev.uuid, 'screenshot', 'Capture Screen')" title="Take Desktop Screenshot">📸 Screen</button>
+                            <button class="cmd-btn yellow" @click="sendCommand(dev.uuid, 'restart_spooler', 'Restart Spooler')" title="Restart Print Spooler Service">🖨️ Spooler</button>
+                            <button class="cmd-btn red" @click="sendCommand(dev.uuid, 'lock_screen', 'Lock Workstation')" title="Lock Remote Screen">🔒 Lock</button>
+                            <button class="cmd-btn red" @click="sendCommand(dev.uuid, 'restart_now', 'Reboot Machine')" title="Reboot Computer">🔄 Reboot</button>
+                        </div>
+                    </div>
+                </template>
+                <div x-show="devices.filter(d=>d.status==='ONLINE').length === 0" class="text-center py-4 text-muted w-100">
+                    💻 No computers online currently.
                 </div>
             </div>
-        </template>
+
+            <!-- Real-time Command Execution Terminal Log Feed -->
+            <div style="border-top: 1px dashed var(--border); padding-top: 20px;">
+                <div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 12px;">
+                    <h4 class="fw-bold m-0" style="display: flex; align-items: center; gap: 8px;">
+                        <span>📺 Real-Time Command Execution Log Feed</span>
+                        <span x-show="taskPollingInterval" class="badge info" style="font-size: 11px;">⚡ Auto-polling 2s</span>
+                    </h4>
+                </div>
+
+                <div class="table-wrapper">
+                    <table>
+                        <thead>
+                            <tr>
+                                <th>Task ID</th>
+                                <th>Host / Device</th>
+                                <th>Command / Script</th>
+                                <th>Status</th>
+                                <th>Requested At</th>
+                                <th>Console Log</th>
+                            </tr>
+                        </thead>
+                        <tbody>
+                            <template x-for="t in recentTasks" :key="t.id">
+                                <tr>
+                                    <td class="mono fw-bold" x-text="'#' + t.id"></td>
+                                    <td>
+                                        <div class="fw-bold" x-text="t.hostname"></div>
+                                        <div class="mono small text-muted" x-text="t.device_id"></div>
+                                    </td>
+                                    <td>
+                                        <code style="background: rgba(0,0,0,0.06); padding: 2px 6px; border-radius: 4px; font-size: 12px;" x-text="t.script"></code>
+                                    </td>
+                                    <td>
+                                        <span class="badge" 
+                                              :class="t.status === 'success' ? 'online' : (t.status === 'failed' ? 'offline' : (t.status === 'processing' ? 'info' : 'warning'))"
+                                              x-text="t.status.toUpperCase()">
+                                        </span>
+                                    </td>
+                                    <td class="small mono" x-text="formatDate(t.created_at)"></td>
+                                    <td>
+                                        <button class="btn-sm btn-outline" @click="openTaskLog(t)">📟 View Terminal Log</button>
+                                    </td>
+                                </tr>
+                            </template>
+                            <tr x-show="recentTasks.length === 0">
+                                <td colspan="6" class="text-center py-4 text-muted">No task execution history yet.</td>
+                            </tr>
+                        </tbody>
+                    </table>
+                </div>
+            </div>
+        </div>
     </div>
 </section>
+
+<!-- TERMINAL LOG MODAL -->
+<div class="modal-overlay" x-show="showTaskModal" x-cloak @click.self="showTaskModal=false">
+    <div class="modal-box" style="max-width: 720px; background: #18181b; color: #f4f4f5; border: 1px solid #27272a;">
+        <div class="modal-head" style="border-bottom: 1px solid #27272a; padding: 12px 16px;">
+            <h3 style="color: #4ade80; font-family: monospace; font-size: 16px; margin: 0; display: flex; align-items: center; gap: 8px;">
+                <span>📟 Terminal Output Console — Task #<span x-text="selectedTask?.id"></span></span>
+            </h3>
+            <button class="modal-close" style="color: #a1a1aa;" @click="showTaskModal=false">✕</button>
+        </div>
+        <div class="modal-body p-3">
+            <div style="margin-bottom: 12px; font-size: 13px; font-family: monospace; color: #a1a1aa; display: grid; grid-template-columns: 1fr 1fr; gap: 8px;">
+                <div>Host: <span style="color: #ffffff;" x-text="selectedTask?.hostname"></span></div>
+                <div>Status: <span style="color: #60a5fa;" x-text="selectedTask?.status"></span></div>
+                <div style="grid-column: span 2;">Command: <span style="color: #facc15;" x-text="selectedTask?.script"></span></div>
+            </div>
+            
+            <label class="small text-muted mb-1" style="display: block; font-family: monospace; color: #71717a;">STDOUT / STDERR LOG OUTPUT:</label>
+            <pre style="background: #09090b; color: #4ade80; padding: 14px; border-radius: 6px; font-family: 'Consolas', 'Courier New', monospace; font-size: 13px; max-height: 350px; overflow-y: auto; white-space: pre-wrap; word-break: break-all; border: 1px solid #27272a; margin: 0;" x-text="selectedTask?.output || '[Waiting for execution log output from agent...]'"></pre>
+        </div>
+    </div>
+</div>

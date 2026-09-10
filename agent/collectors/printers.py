@@ -79,6 +79,26 @@ def get_printers_info():
             name = getattr(printer, "Name", "Unknown")
             if name in seen_printers:
                 continue
+            
+            # Skip network-mapped shared printers (mapped from other PCs)
+            is_network = getattr(printer, "Network", False)
+            is_local = getattr(printer, "Local", True)
+            if is_network or not is_local:
+                continue
+                
+            # Skip virtual software printers (PDF, OneNote, Snagit, etc.)
+            port = (getattr(printer, "PortName", "") or "").lower()
+            p_name = name.lower()
+            virtual_keywords = ["pdf", "onenote", "evernote", "snagit", "rustdesk", "virtual", "xps", "fax", "writer"]
+            is_virtual = False
+            for kw in virtual_keywords:
+                if kw in port or kw in p_name:
+                    is_virtual = True
+                    break
+            
+            if port in ["nul:", "portprompt:"] or is_virtual:
+                continue
+                
             seen_printers.add(name)
             
             driver_name = getattr(printer, "DriverName", "")

@@ -40,75 +40,89 @@ def collect_monitors():
     monitors = []
     if platform.system() != "Windows":
         return monitors
+
     try:
-        c = wmi.WMI(namespace="root\\wmi")
-        for mon in c.WmiMonitorID():
+        c_wmi = wmi.WMI(namespace="root\\wmi")
+        mon_ids = c_wmi.WmiMonitorID()
+        params_list = c_wmi.WmiMonitorBasicDisplayParams()
+
+        # ดึง Resolution รวมจาก Win32_VideoController
+        resolution = ""
+        try:
+            c_win32 = wmi.WMI()
+            for vc in c_win32.Win32_VideoController():
+                h = getattr(vc, "CurrentHorizontalResolution", 0)
+                v = getattr(vc, "CurrentVerticalResolution", 0)
+                if h and v:
+                    resolution = f"{h}x{v}"
+                    break
+        except Exception:
+            pass
+
+        def decode_bytes(arr):
+            if not arr:
+                return ""
+            return "".join(chr(b) for b in arr if b != 0).strip()
+
+        for idx, mon in enumerate(mon_ids):
             try:
-                # Decode byte arrays to string
-                def decode_bytes(arr):
-                    if not arr:
-                        return ""
-                    return "".join(chr(b) for b in arr if b != 0).strip()
+                serial = decode_bytes(getattr(mon, "SerialNumberID", []))
+                model = decode_bytes(getattr(mon, "UserFriendlyName", []))
+                manufacturer = decode_bytes(
+                    getattr(mon, "ManufacturerName", [])
+                )
 
-                serial      = decode_bytes(getattr(mon, "SerialNumberID", []))
-                model       = decode_bytes(getattr(mon, "UserFriendlyName", []))
-                manufacturer= decode_bytes(getattr(mon, "ManufacturerName", []))
-
-                # Get physical size from WmiMonitorBasicDisplayParams
+                size_inch = 0
                 size_cm = 0
-                resolution = ""
-                try:
-                    c2 = wmi.WMI(namespace="root\\wmi")
-                    params_list = c2.WmiMonitorBasicDisplayParams()
-                    if params_list:
-                        p = params_list[0]  # Match by index if multiple monitors
-                        w_cm = getattr(p, "MaxHorizontalImageSize", 0)  # cm
-                        h_cm = getattr(p, "MaxVerticalImageSize", 0)    # cm
-                        if w_cm and h_cm:
-                            diag_cm = math.sqrt(w_cm**2 + h_cm**2)
-                            size_cm = round(diag_cm)
-                except Exception:
-                    pass
 
-                # Get resolution from Win32_VideoController (current display mode)
-                try:
-                    c3 = wmi.WMI()
-                    for vc in c3.Win32_VideoController():
-                        h = getattr(vc, "CurrentHorizontalResolution", 0)
-                        v = getattr(vc, "CurrentVerticalResolution", 0)
-                        if h and v:
-                            resolution = f"{h}x{v}"
-                            break
-                except Exception:
-                    pass
+                # จับคู่ params ตาม Index เดียวกันกับ mon_ids
+                if idx < len(params_list):
+                    p = params_list[idx]
+                    w_cm = getattr(p, "MaxHorizontalImageSize", 0)  # cm
+                    h_cm = getattr(p, "MaxVerticalImageSize", 0)  # cm
 
-                if model:  # Only add if we got a valid model name
-                    monitors.append({
-                        "serial":       serial or "N/A",
-                        "model":        model,
-                        "manufacturer": manufacturer,
-                        "size_cm":      size_cm,
-                        "resolution":   resolution
-                    })
+                    if w_cm > 0 and h_cm > 0:
+                        diag_cm = math.sqrt(w_cm**2 + h_cm**2)
+                        size_cm = round(diag_cm)
+                        size_inch = round(
+                            diag_cm / 2.54
+                        )  # แปลงเซนติเมตรเป็นนิ้ว
+
+                if model:  # เพิ่มเฉพาะรายการที่มีชื่อรุ่น
+                    monitors.append(
+                        {
+                            "serial": serial or "N/A",
+                            "model": model,
+                            "manufacturer": manufacturer,
+                            "size_inch": size_inch,  # นิ้ว (เช่น 24, 27)
+                            "size_cm": size_cm,  # เซนติเมตร
+                            "resolution": resolution,
+                        }
+                    )
             except Exception as e:
                 print(f"[Monitor] Error reading monitor entry: {e}")
+
     except Exception as e:
         print(f"[Monitor] WMI namespace error: {e}")
-        # Fallback: use Win32_DesktopMonitor
+        # Fallback: ใช้ Win32_DesktopMonitor
         try:
             c = wmi.WMI()
             for mon in c.Win32_DesktopMonitor():
                 name = getattr(mon, "Name", "") or ""
                 if name and name.strip():
-                    monitors.append({
-                        "serial":       "N/A",
-                        "model":        name.strip(),
-                        "manufacturer": "",
-                        "size_cm":      0,
-                        "resolution":   ""
-                    })
+                    monitors.append(
+                        {
+                            "serial": "N/A",
+                            "model": name.strip(),
+                            "manufacturer": "",
+                            "size_inch": 0,
+                            "size_cm": 0,
+                            "resolution": "",
+                        }
+                    )
         except Exception as e2:
             print(f"[Monitor] Fallback error: {e2}")
+
     return monitors
 
 def get_hardware_info():
@@ -148,14 +162,45 @@ def get_hardware_info():
                     "serial": mem.SerialNumber.strip()
                 })
             
-            # Physical Disks (Not partitions)
+            # Physical Disks with S.M.A.R.T. Predict Failure
+            # Step 1: Build a mapping of InstanceName -> predict_failure from MSStorageDriver_FailurePredictStatus
+            smart_failure_map = {}
+            try:
+                c_wmi = wmi.WMI(namespace="root\\wmi")
+                for smart in c_wmi.MSStorageDriver_FailurePredictStatus():
+                    inst = getattr(smart, "InstanceName", "") or ""
+                    # InstanceName format: "SCSI\\DISK&...\\X&Y&Z{N}" — split by __ to get device ID prefix
+                    predict = getattr(smart, "PredictFailure", False) or False
+                    # Use the first segment before "__" as key for partial matching
+                    key = inst.split("\\")[-1].upper() if inst else ""
+                    smart_failure_map[key] = bool(predict)
+            except Exception:
+                pass  # WMI SMART query not supported on this machine
+
             for disk in c.Win32_DiskDrive():
+                # Map this disk's PNPDeviceID or DeviceID against SMART map
+                pnp = (disk.PNPDeviceID or "").upper()
+                device_id_short = pnp.split("\\")[-1].upper() if pnp else ""
+
+                # Try to find a matching entry in the SMART failure map
+                predict_failure = False
+                for key, val in smart_failure_map.items():
+                    if key and (key in pnp or device_id_short in key):
+                        predict_failure = val
+                        break
+                else:
+                    # Fallback: check Win32_DiskDrive.Status field
+                    status = (getattr(disk, "Status", "") or "").upper()
+                    if "PRED FAIL" in status:
+                        predict_failure = True
+
                 hw["storage"].append({
                     "model": disk.Model,
-                    "size_gb": round(int(disk.Size) / (1024**3), 2),
+                    "size_gb": round(int(disk.Size) / (1024**3), 2) if disk.Size else 0,
                     "serial": disk.SerialNumber.strip() if disk.SerialNumber else "N/A",
                     "interface": disk.InterfaceType,
-                    "media_type": disk.MediaType
+                    "media_type": disk.MediaType,
+                    "predict_failure": predict_failure
                 })
             
             # GPU Detail

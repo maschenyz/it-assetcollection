@@ -1,23 +1,38 @@
 <!-- VIEW: SCREENSHOTS -->
 <section x-show="view==='screenshots'" x-cloak>
     <div class="card">
-        <div class="card-header">
-            <h3 class="card-title">Recent Captures</h3>
-            <button class="btn-outline" @click="loadScreenshots()">🔄 Refresh</button>
+        <div class="card-header" style="display: flex; justify-content: space-between; align-items: center; flex-wrap: wrap; gap: 12px;">
+            <div style="display: flex; align-items: center; gap: 12px;">
+                <h3 class="card-title">📸 Recent Captures</h3>
+                <span class="badge info">📅 Auto-delete after 90 days</span>
+            </div>
+            <div style="display: flex; gap: 8px; align-items: center; flex-wrap: wrap;">
+                <input type="text" class="input-sm" placeholder="🔍 Search Hostname..." x-model="screenshotSearch" style="width: 180px;">
+                <input type="date" class="input-sm" x-model="screenshotDateFilter">
+                <button class="btn-sm btn-outline" x-show="screenshotSearch || screenshotDateFilter" @click="screenshotSearch=''; screenshotDateFilter=''">Reset</button>
+                <button class="btn-outline" @click="loadScreenshots()">🔄 Refresh</button>
+            </div>
         </div>
         <div class="p-4">
-            <div class="screenshot-grid">
-                <template x-for="s in screenshots" :key="s.id">
-                    <div class="screenshot-item" @click="viewFullImage(s.id)">
-                        <div class="screenshot-thumb">
-                            <img :src="'/api/v1/screenshots/'+s.id">
+            <div class="screenshot-grid" x-show="filteredScreenshots.length > 0">
+                <template x-for="s in filteredScreenshots" :key="s.id">
+                    <div class="screenshot-item">
+                        <div class="screenshot-thumb" @click="viewFullImage(s.id)">
+                            <img :src="getScreenshotUrl(s.id)" loading="lazy">
                         </div>
-                        <div class="screenshot-meta">
-                            <div class="fw-bold" x-text="s.hostname"></div>
-                            <div class="small text-muted" x-text="formatDate(s.created_at)"></div>
+                        <div class="screenshot-meta" style="display: flex; justify-content: space-between; align-items: center;">
+                            <div>
+                                <div class="fw-bold" x-text="s.hostname"></div>
+                                <div class="small text-muted" x-text="formatDate(s.created_at)"></div>
+                            </div>
+                            <button class="btn-sm text-danger" style="border:none; background:transparent; cursor:pointer; font-size:16px;" @click.stop="deleteScreenshot(s.id)" title="Delete image">🗑️</button>
                         </div>
                     </div>
                 </template>
+            </div>
+            <div x-show="filteredScreenshots.length === 0" class="text-center py-5 text-muted">
+                <div style="font-size: 40px; margin-bottom: 8px;">📷</div>
+                <p>No screenshots found.</p>
             </div>
         </div>
     </div>

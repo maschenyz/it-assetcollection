@@ -89,6 +89,20 @@ CREATE TABLE IF NOT EXISTS asset.device_facts (
     updated_at TIMESTAMPTZ DEFAULT CURRENT_TIMESTAMP
 );
 
+CREATE TABLE IF NOT EXISTS asset.security_products (
+    id BIGSERIAL PRIMARY KEY,
+    device_id TEXT REFERENCES asset.devices(uuid) ON DELETE CASCADE,
+    product_name TEXT NOT NULL,
+    vendor TEXT DEFAULT '',
+    product_state INTEGER DEFAULT 0,
+    realtime_protection_enabled BOOLEAN DEFAULT FALSE,
+    signature_status TEXT DEFAULT 'unknown',
+    source TEXT DEFAULT '',
+    raw_data JSONB DEFAULT '{}'::jsonb,
+    detected_at TIMESTAMPTZ DEFAULT CURRENT_TIMESTAMP,
+    UNIQUE(device_id, product_name)
+);
+
 CREATE TABLE IF NOT EXISTS asset.device_assets (
     device_id TEXT PRIMARY KEY REFERENCES asset.devices(uuid) ON DELETE CASCADE,
     sku TEXT DEFAULT '',
@@ -242,6 +256,7 @@ CREATE TABLE IF NOT EXISTS asset.system_settings (
 CREATE INDEX IF NOT EXISTS idx_devices_status ON asset.devices(status);
 CREATE INDEX IF NOT EXISTS idx_devices_last_seen ON asset.devices(last_seen DESC);
 CREATE INDEX IF NOT EXISTS idx_devices_location ON asset.devices(location_id);
+CREATE INDEX IF NOT EXISTS idx_security_products_device ON asset.security_products(device_id, detected_at DESC);
 CREATE INDEX IF NOT EXISTS idx_task_queue_device_status ON asset.task_queue(device_id, status);
 CREATE INDEX IF NOT EXISTS idx_task_queue_status ON asset.task_queue(status, expires_at);
 CREATE INDEX IF NOT EXISTS idx_heartbeats_device ON asset.heartbeats(device_id, captured_at DESC);

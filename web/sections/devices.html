@@ -1,58 +1,172 @@
 <!-- VIEW: DEVICES LIST (INVENTORY) -->
 <section x-show="view==='devices'" x-cloak>
+    <!-- FILTER INDICATOR BAR -->
+    <div x-show="filterStatus || filterType || filterMfg || filterBranch || filterDept" 
+         class="mb-3 p-3 bg-light rounded d-flex align-items-center" 
+         style="border: 1px solid var(--border-color); gap: 10px; flex-wrap: wrap;">
+        <span class="text-muted small">Active Filters:</span>
+        <template x-if="filterStatus"><span class="badge online" x-text="'Status: ' + filterStatus"></span></template>
+        <template x-if="filterType"><span class="badge software" x-text="'Type: ' + filterType"></span></template>
+        <template x-if="filterMfg"><span class="badge hardware" x-text="'Mfg: ' + filterMfg"></span></template>
+        <template x-if="filterBranch"><span class="badge virtual" x-text="'Building: ' + filterBranch"></span></template>
+        <template x-if="filterDept"><span class="badge virtual" x-text="'Dept: ' + filterDept"></span></template>
+        <button class="btn-sm btn-outline ms-auto" @click="resetFilters(false)">Reset Filters ✕</button>
+    </div>
+
+    <!-- BULK ACTION BAR -->
+    <div x-show="selectedDeviceUUIDs.length > 0" 
+         class="mb-3 p-3 bg-light rounded d-flex align-items-center" 
+         style="border: 1px dashed var(--accent-orange); gap: 10px; flex-wrap: wrap; background-color: #fff9f4;">
+        <span class="fw-bold" style="color: var(--accent-orange);" x-text="'Selected: ' + selectedDeviceUUIDs.length + ' computer(s)'"></span>
+        <div class="ms-auto d-flex align-items-center" style="gap: 10px;">
+            <label class="small text-muted mb-0">Relocate to:</label>
+            <select class="form-control-sm" x-model="bulkLocationID" style="padding: 4px 8px; border-radius: 4px; border: 1px solid var(--border-color);">
+                <option value="">-- Select Location --</option>
+                <template x-for="loc in locations" :key="loc.id">
+                    <option :value="loc.id" x-text="loc.label"></option>
+                </template>
+            </select>
+            <button class="btn-sm btn-primary" @click="applyBulkLocation()">Relocate 🏢</button>
+            <button class="btn-sm btn-outline" @click="selectedDeviceUUIDs = []">Deselect All</button>
+        </div>
+    </div>
+
     <div class="card">
         <div class="card-header">
             <h3 class="card-title">Computer Inventory</h3>
             <input type="text" class="search-input" placeholder="Search devices..." x-model="searchQuery">
         </div>
         <div class="table-wrapper">
-            <table>
+            <table style="width: 100%; border-collapse: collapse; table-layout: fixed;">
+                <colgroup>
+                    <col style="width: 40px;">
+                    <col style="width: 110px;">
+                    <col style="width: 160px;">
+                    <col style="width: 155px;">
+                    <col style="width: 230px;">
+                    <col style="width: 100px;">
+                    <col style="width: 90px;">
+                    <col style="width: 170px;">
+                    <col style="width: 130px;">
+                    <col style="width: 90px;">
+                    <col style="width: 90px;">
+                </colgroup>
                 <thead>
                     <tr>
+                        <th style="text-align: center; vertical-align: middle;">
+                            <input type="checkbox" 
+                                   :checked="selectedDeviceUUIDs.length === filteredDevices.length && filteredDevices.length > 0" 
+                                   @change="toggleSelectAll($event.target.checked)">
+                        </th>
                         <th>Asset #</th>
                         <th>Device (Type)</th>
-                        <th>Operating System</th>
-                        <th>Branch Location</th>
-                        <th>Antivirus</th>
+                        <th>Building / Department</th>
+                        <th>Specs (CPU / RAM / Storage)</th>
+                        <th>Monitor Size</th>
+                        <th>Programs</th>
+                        <th>Printers</th>
+                        <th>Security / HOSxP</th>
                         <th>Status</th>
                         <th>Action</th>
                     </tr>
                 </thead>
                 <tbody>
                     <template x-for="dev in filteredDevices" :key="dev.uuid">
-                        <tr>
-                            <td class="mono fw-bold" x-text="dev.asset_number || '-'"></td>
-                            <td>
-                                <div class="fw-bold" x-text="dev.hostname"></div>
-                                <span class="badge mt-2" 
-                                      :class="{
-                                          'badge software': dev.device_type === 'Laptop / Notebook',
-                                          'badge hardware': dev.device_type === 'Desktop PC',
-                                          'badge online': dev.device_type === 'All-in-One (AIO)',
-                                          'badge virtual': dev.device_type === 'Virtual Machine (VM)'
-                                      }" 
-                                      x-text="dev.device_type || 'PC'">
-                                </span>
+                        <tr :style="dev.disk_failed ? 'background: rgba(224,122,95,0.06);' : ''">
+                            <td style="text-align: center; vertical-align: top; padding: 12px 6px;">
+                                <input type="checkbox" :value="dev.uuid" x-model="selectedDeviceUUIDs">
                             </td>
-                            <td>
-                                <div class="fw-bold" x-text="getOsLabel(dev)"></div>
-                                <div class="mono small text-muted" x-text="dev.ip_address"></div>
-                            </td>
-                            <td>
-                                <div class="fw-bold" x-text="dev.building_name || 'Unassigned'"></div>
-                                <div class="small text-muted" x-text="dev.department_name || '-'"></div>
-                            </td>
-                            <td>
-                                <div>
+                            <td class="mono fw-bold" style="vertical-align: top; padding: 12px 10px; word-break: break-word;" x-text="dev.asset_number || '-'"></td>
+                            <td style="vertical-align: top; padding: 12px 10px;">
+                                <div class="fw-bold d-flex align-items-center" style="display: flex; align-items: center; gap: 6px; flex-wrap: wrap;">
+                                    <span x-text="dev.hostname" style="word-break: break-all;"></span>
+                                    <template x-if="dev.disk_failed">
+                                        <span class="badge danger blinking" title="S.M.A.R.T. ตรวจพบดิสก์กำลังจะพัง!">🚨 DISK FAIL</span>
+                                    </template>
+                                </div>
+                                <div style="margin-top: 4px;">
                                     <span class="badge" 
-                                          :class="dev.av_enabled === 'true' ? 'online' : 'offline'"
-                                          x-text="dev.av_enabled === 'true' ? '🛡️ Protected' : '⚠️ Unprotected'">
+                                          :class="{
+                                              'badge software': dev.device_type === 'Laptop / Notebook',
+                                              'badge hardware': dev.device_type === 'Desktop PC',
+                                              'badge online': dev.device_type === 'All-in-One (AIO)',
+                                              'badge virtual': dev.device_type === 'Virtual Machine (VM)'
+                                          }" 
+                                          x-text="dev.device_type || 'PC'">
                                     </span>
-                                    <div class="small text-muted mt-2" x-show="dev.av_version" x-text="dev.av_version"></div>
+                                </div>
+                                <div class="mono small text-muted" style="margin-top: 4px; font-size: 11px;" x-text="dev.ip_address"></div>
+                            </td>
+                            <td style="vertical-align: top; padding: 12px 10px;">
+                                <div class="small fw-bold" x-text="dev.building_name || '-'"></div>
+                                <div class="small text-muted" style="margin-top: 4px; font-size: 11px;" x-text="dev.department_name || '-' "></div>
+                            </td>
+                            <td style="vertical-align: top; padding: 12px 10px;">
+                                <div class="small fw-bold" style="word-break: break-word;" x-text="dev.cpu_name || '-'"></div>
+                                <div class="small text-muted" style="margin-top: 4px; font-size: 11px;" x-text="'RAM: ' + (dev.ram_gb ? Math.round(dev.ram_gb) + ' GB' : '-') + ' / Disk: ' + (dev.storage_gb ? Math.round(dev.storage_gb) + ' GB' : '-')"></div>
+                            </td>
+                            <td style="vertical-align: top; padding: 12px 10px;">
+                                <span class="small" x-text="dev.screen_sizes ? dev.screen_sizes.replaceAll('inc', '\"') : '-'"></span>
+                            </td>
+                            <td style="vertical-align: top; padding: 12px 10px;">
+                                <span class="badge software" x-text="(dev.software_count || 0) + ' Apps'"></span>
+                            </td>
+                            <td style="vertical-align: top; padding: 12px 10px;">
+                                <template x-if="!dev.connected_printers || dev.connected_printers.length === 0">
+                                    <span class="small text-muted">-</span>
+                                </template>
+                                <template x-if="dev.connected_printers && dev.connected_printers.length > 0">
+                                    <div style="display: flex; flex-direction: column; gap: 4px;">
+                                        <!-- Active Printers (seen within 30 days) -->
+                                        <template x-for="p in dev.connected_printers.filter(p => p.type !== 'Virtual' && p.type !== 'USB (Disconnected)' && isRecentPrinter(p.last_seen))" :key="p.name">
+                                            <div style="display: flex; align-items: center;">
+                                                <span class="badge online" style="font-size: 10px; padding: 2px 6px; white-space: normal; word-break: break-word;"
+                                                      x-text="(p.type === 'USB' ? '🖨️ ' : (p.type === 'Network' ? '🌐 ' : '🖨️ ')) + p.name"
+                                                      :title="'Type: ' + p.type + (p.brand ? ' | ' + p.brand : '')">
+                                                </span>
+                                            </div>
+                                        </template>
+                                        <!-- USB Disconnected — seen within 30 days -->
+                                        <template x-for="p in dev.connected_printers.filter(p => p.type === 'USB (Disconnected)' && isRecentPrinter(p.last_seen))" :key="'disc-' + p.name">
+                                            <div style="display: flex; align-items: center;">
+                                                <span class="badge offline" style="font-size: 10px; padding: 2px 6px; opacity: 0.8; white-space: normal; word-break: break-word;"
+                                                      x-text="'⚠️ ' + p.name"
+                                                      :title="'USB (Disconnected) | Last: ' + formatDate(p.last_seen)">
+                                                </span>
+                                            </div>
+                                        </template>
+                                        <!-- History — older than 30 days -->
+                                        <template x-if="dev.connected_printers.filter(p => !isRecentPrinter(p.last_seen)).length > 0">
+                                            <span class="small text-muted" style="font-size: 10px; font-style: italic;"
+                                                  x-text="'📦 ' + dev.connected_printers.filter(p => !isRecentPrinter(p.last_seen)).length + ' in history'"
+                                                  :title="dev.connected_printers.filter(p => !isRecentPrinter(p.last_seen)).map(p => p.name).join(', ')">
+                                            </span>
+                                        </template>
+                                    </div>
+                                </template>
+                            </td>
+                            <td style="vertical-align: top; padding: 12px 10px;">
+                                <div style="display: flex; flex-direction: column; gap: 4px; align-items: flex-start;">
+                                    <span class="badge" 
+                                          style="font-size: 10px; padding: 2px 6px;"
+                                          :class="dev.security_protected ? 'online' : 'offline'"
+                                          x-text="dev.security_protected ? '🛡️ Protected' : '⚠️ Unprotected'">
+                                    </span>
+                                    <span class="small fw-bold" style="font-size: 10px; line-height: 1.2; word-break: break-word;" x-text="dev.security_product_name || 'No active AV reported'" :title="dev.security_vendor || ''"></span>
+                                    <span class="small text-muted" style="font-size: 10px;" x-show="dev.security_signature_status" x-text="`Signature: ${dev.security_signature_status}`"></span>
+                                    <span class="badge" 
+                                          style="font-size: 10px; padding: 2px 6px;"
+                                          :class="dev.has_hosxp ? 'online' : 'offline'"
+                                          x-text="dev.has_hosxp ? '🏥 HOSxP' : '🏥 No HOSxP'">
+                                    </span>
                                 </div>
                             </td>
-                            <td><span class="badge" :class="dev.status==='ONLINE'?'online':'offline'" x-text="dev.status"></span></td>
-                            <td><button class="btn-sm" @click="openDetail(dev)">📋 Details</button></td>
+                            <td style="vertical-align: top; padding: 12px 10px; text-align: center;">
+                                <span class="badge" :class="dev.status==='ONLINE'?'online':'offline'" x-text="dev.status"></span>
+                            </td>
+                            <td style="vertical-align: top; padding: 12px 10px; text-align: center;">
+                                <button class="btn-sm" @click="openDetail(dev)">📋 Details</button>
+                            </td>
                         </tr>
                     </template>
                 </tbody>

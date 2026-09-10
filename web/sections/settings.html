@@ -10,7 +10,10 @@
                 <input type="text" class="search-input w-100 mb-2" x-model="settings.TELEGRAM_CHAT_ID">
                 <label class="small fw-bold">Line Notify Token</label>
                 <input type="password" class="search-input w-100 mb-2" x-model="settings.LINE_NOTIFY_TOKEN">
-                <button class="btn-primary w-100 mt-2" @click="saveSettings()">💾 Save Tokens</button>
+                <div class="flex gap-2 mt-2">
+                    <button class="btn-primary flex-1" @click="saveSettings()">💾 Save Tokens</button>
+                    <button class="btn-outline" @click="testTelegram()" title="Test Telegram Notification">📲 Test Telegram</button>
+                </div>
             </div>
         </div>
         <div class="hw-card">

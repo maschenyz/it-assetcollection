@@ -3,23 +3,46 @@
 
     <!-- TOP KPI -->
     <div class="stats-row stats-row-6 mb-4">
-        <div class="stat-card kpi red">
+        <!-- TOTAL COMPUTERS -->
+        <div class="stat-card kpi red" @click="resetFilters()" style="cursor: pointer;">
             <div class="stat-body">
                 <div class="stat-value" x-text="stats.computers"></div>
-                <div class="stat-label">คอมพิวเตอร์</div>
+                <div class="stat-label">คอมพิวเตอร์ทั้งหมด</div>
             </div>
             <div class="stat-icon">🖥️</div>
         </div>
 
-        <div class="stat-card kpi blue">
+        <!-- ONLINE -->
+        <div class="stat-card kpi green" @click="setFilter('status', 'ONLINE')" style="cursor: pointer;">
             <div class="stat-body">
-                <div class="stat-value" x-text="stats.monitors"></div>
-                <div class="stat-label">จอภาพ</div>
+                <div class="stat-value" x-text="statusStats.find(x => x.name.includes('Online'))?.count || 0"></div>
+                <div class="stat-label">ออนไลน์วันนี้</div>
             </div>
-            <div class="stat-icon">🖵</div>
+            <div class="stat-icon">🟢</div>
         </div>
 
-        <div class="stat-card kpi green">
+        <!-- OFFLINE -->
+        <div class="stat-card kpi gray" @click="setFilter('status', 'OFFLINE')" style="cursor: pointer;">
+            <div class="stat-body">
+                <div class="stat-value" x-text="statusStats.find(x => x.name.includes('Offline'))?.count || 0"></div>
+                <div class="stat-label">ออฟไลน์วันนี้</div>
+            </div>
+            <div class="stat-icon">🔴</div>
+        </div>
+
+        <!-- OVERTIME ALERT -->
+        <div class="stat-card kpi orange" 
+             @click="stats.overtime_count > 0 ? setFilter('dept', stats.overtime_dept) : null" 
+             style="cursor: pointer;"
+             :style="stats.overtime_count > 0 ? 'border: 2px solid var(--accent-orange);' : ''">
+            <div class="stat-body">
+                <div class="stat-value" x-text="stats.overtime_count || 0"></div>
+                <div class="stat-label" x-text="stats.overtime_count > 0 ? 'เปิดค้าง >2 วัน (' + stats.overtime_dept + ')' : 'ไม่มีเครื่องเปิดค้าง >2 วัน'"></div>
+            </div>
+            <div class="stat-icon">⚠️</div>
+        </div>
+
+        <div class="stat-card kpi blue" @click="switchView('printers')" style="cursor: pointer;">
             <div class="stat-body">
                 <div class="stat-value" x-text="stats.printers"></div>
                 <div class="stat-label">ปริ้นเตอร์</div>
@@ -27,20 +50,12 @@
             <div class="stat-icon">🖨️</div>
         </div>
 
-        <div class="stat-card kpi lime">
+        <div class="stat-card kpi lime" @click="switchView('software')" style="cursor: pointer;">
             <div class="stat-body">
                 <div class="stat-value" x-text="stats.software"></div>
-                <div class="stat-label">โปรแกรม</div>
+                <div class="stat-label">โปรแกรมทั้งหมด</div>
             </div>
             <div class="stat-icon">📦</div>
-        </div>
-
-        <div class="stat-card kpi orange">
-            <div class="stat-body">
-                <div class="stat-value" x-text="stats.licenses"></div>
-                <div class="stat-label">ลิขสิทธิ์</div>
-            </div>
-            <div class="stat-icon">🔑</div>
         </div>
     </div>
 
@@ -54,7 +69,7 @@
             </div>
             <div class="mini-list">
                 <template x-for="item in statusStats" :key="item.name">
-                    <div class="mini-row">
+                    <div class="mini-row" @click="setFilter('status', item.name.includes('Online') ? 'ONLINE' : 'OFFLINE')" style="cursor: pointer;">
                         <div class="mini-left">
                             <div class="mini-badge" x-text="item.count"></div>
                             <div class="mini-name" x-text="item.name"></div>
@@ -71,7 +86,7 @@
             </div>
             <div class="mini-list">
                 <template x-for="item in manufacturerStats" :key="item.name">
-                    <div class="mini-row">
+                    <div class="mini-row" @click="setFilter('mfg', item.name)" style="cursor: pointer;">
                         <div class="mini-left">
                             <div class="mini-badge" x-text="item.count"></div>
                             <div class="mini-name" x-text="item.name"></div>
@@ -88,7 +103,7 @@
             </div>
             <div class="mini-list">
                 <template x-for="item in typeStats" :key="item.name">
-                    <div class="mini-row">
+                    <div class="mini-row" @click="setFilter('type', item.name)" style="cursor: pointer;">
                         <div class="mini-left">
                             <div class="mini-name" x-text="item.name"></div>
                         </div>

@@ -4,6 +4,15 @@
         <button class="btn-outline" @click="switchView('devices')">← Back to List</button>
         <button class="btn-danger" x-show="userRole === 'admin'" @click="deleteDevice(detailDevice?.uuid)">🗑️ Delete Device</button>
         <button class="btn-primary ms-2" x-show="userRole === 'admin'" @click="openEditAssetModal()">📝 Edit Asset Info</button>
+        <button @click="launchVNC(detailDevice?.ip_address)" 
+                class="btn-outline ms-2" 
+                style="display: inline-flex; align-items: center; gap: 4px;" 
+                x-show="detailDevice?.ip_address">
+            📺 Launch VNC
+        </button>
+
+
+
         <div class="ms-auto fw-bold" x-text="detailDevice?.hostname"></div>
     </div>
 
@@ -103,19 +112,25 @@
                     </div>
                     
                     <div class="card">
-                        <div class="card-header"><h3 class="card-title">🖨️ Connected Printers</h3></div>
+                        <div class="card-header"><h3 class="card-title">🖨️ Connected USB Printers</h3></div>
                         <div class="table-wrapper">
                             <table>
-                                <thead><tr><th>Name</th><th>Model</th><th>Network</th></tr></thead>
+                                <thead><tr><th>Name / Model</th><th>Brand</th><th>Type</th><th>Port / IP</th></tr></thead>
                                 <tbody>
-                                    <template x-for="(p, i) in detailDevice.hardware?.printers" :key="i">
+                                    <template x-for="(p, i) in ((detailDevice.printers?.length ? detailDevice.printers : detailDevice.hardware?.printers || []).filter(item => (item.type || '').includes('USB') || (item.printer_type || '').includes('USB') || (!item.network && (item.port_name || '').toUpperCase().includes('USB'))))" :key="i">
                                         <tr>
-                                            <td class="fw-bold" x-text="p.name"></td>
-                                            <td x-text="p.model || '-'"></td>
-                                            <td><span class="badge" :class="p.network ? 'online' : 'usb'" x-text="p.network ? 'Network' : 'Local'"></span></td>
+                                            <td>
+                                                <div class="fw-bold" x-text="p.name || p.printer_name"></div>
+                                                <div class="small text-muted" x-text="p.model || p.printer_model || '-'"></div>
+                                            </td>
+                                            <td><span class="badge" x-text="p.brand || 'Generic'"></span></td>
+                                            <td><span class="badge usb" x-text="p.type || p.printer_type || 'USB'"></span></td>
+                                            <td class="mono small" x-text="p.ip || p.port_name || '-'"></td>
                                         </tr>
                                     </template>
-                                    <tr x-show="!detailDevice.hardware?.printers?.length"><td colspan="3" class="text-center py-2">No printers found.</td></tr>
+                                    <tr x-show="!((detailDevice.printers?.length ? detailDevice.printers : detailDevice.hardware?.printers || []).some(item => (item.type || '').includes('USB') || (item.printer_type || '').includes('USB') || (!item.network && (item.port_name || '').toUpperCase().includes('USB'))))">
+                                        <td colspan="4" class="text-center py-2 text-muted">No USB printers connected.</td>
+                                    </tr>
                                 </tbody>
                             </table>
                         </div>
@@ -126,14 +141,22 @@
                     <div class="card-header"><h3 class="card-title">💿 Physical Storage</h3></div>
                     <div class="table-wrapper">
                         <table>
-                            <thead><tr><th>Model</th><th>Size</th><th>Interface</th><th>Serial Number</th></tr></thead>
+                            <thead><tr><th>Model</th><th>Size</th><th>Interface</th><th>Serial Number</th><th>Health Status</th></tr></thead>
                             <tbody>
                                 <template x-for="(disk, i) in detailDevice.hardware?.storage" :key="i">
-                                    <tr>
+                                    <tr :class="disk.predict_failure ? 'bg-danger-subtle' : ''">
                                         <td class="fw-bold" x-text="disk.model"></td>
                                         <td x-text="disk.size_gb + ' GB'"></td>
                                         <td x-text="disk.interface"></td>
                                         <td class="mono small" x-text="disk.serial"></td>
+                                        <td>
+                                            <template x-if="disk.predict_failure">
+                                                <span class="badge danger blinking">🚨 WARNING: PRED FAIL</span>
+                                            </template>
+                                            <template x-if="!disk.predict_failure">
+                                                <span class="badge online">✅ Healthy</span>
+                                            </template>
+                                        </td>
                                     </tr>
                                 </template>
                             </tbody>
@@ -163,12 +186,15 @@
                     <div class="card-header"><h3 class="card-title">🏢 Master Data (ข้อมูลคุมทรัพย์สิน)</h3></div>
                     <div class="p-4">
                         <div class="detail-grid-2">
-                            <div class="detail-row"><div class="detail-label">SKU / Asset Number</div><div class="detail-val fw-bold" x-text="detailDevice.master_data?.sku || '-'"></div></div>
+                            <div class="detail-row"><div class="detail-label">Asset Number</div><div class="detail-val fw-bold" x-text="detailDevice.asset_number || '-'"></div></div>
+                            <div class="detail-row"><div class="detail-label">Location (ตึก/แผนก)</div><div class="detail-val fw-bold" x-text="(detailDevice.building_name || detailDevice.department_name) ? (detailDevice.building_name + ' / ' + detailDevice.department_name) : '-'"></div></div>
+                            <div class="detail-row"><div class="detail-label">SKU / Model ID</div><div class="detail-val" x-text="detailDevice.master_data?.sku || '-'"></div></div>
                             <div class="detail-row"><div class="detail-label">ICT Type</div><div class="detail-val" x-text="detailDevice.master_data?.type_ict || '-'"></div></div>
                             <div class="detail-row"><div class="detail-label">Purchase Date</div><div class="detail-val" x-text="detailDevice.master_data?.purchase_date || '-'"></div></div>
                             <div class="detail-row"><div class="detail-label">Warranty Expiry</div><div class="detail-val" x-text="detailDevice.master_data?.warranty_expire || '-'"></div></div>
                             <div class="detail-row"><div class="detail-label">Warranty (Months)</div><div class="detail-val" x-text="detailDevice.master_data?.warranty_months || 0"></div></div>
                             <div class="detail-row"><div class="detail-label">Price (Amount)</div><div class="detail-val text-success" x-text="detailDevice.master_data?.amount ? parseFloat(detailDevice.master_data.amount).toLocaleString('th-TH') + ' ฿' : '-'"></div></div>
+                            <div class="detail-row"><div class="detail-label">Allow Overtime (เปิดค้างคืนได้)</div><div class="detail-val"><span class="badge" :class="detailDevice.allow_overtime ? 'online' : 'offline'" x-text="detailDevice.allow_overtime ? '✅ Allowed' : '❌ Alert on 20:00'"></span></div></div>
                             <div class="detail-row" style="grid-column: 1 / -1;"><div class="detail-label">Comments</div><div class="detail-val" x-text="detailDevice.master_data?.comment || '-'"></div></div>
                         </div>
                     </div>
@@ -176,14 +202,25 @@
 
                 <div class="detail-grid-2 mb-3">
                     <div class="card">
-                        <div class="card-header"><h3 class="card-title">🛡️ Microsoft Defender</h3></div>
+                        <div class="card-header"><h3 class="card-title">🛡️ Security Products</h3></div>
                         <div class="p-4">
-                            <div class="detail-row"><div class="detail-label">Realtime</div><div class="detail-val" x-text="detailDevice.facts?.defender?.realtime_protection_enabled ? 'Enabled' : 'Disabled/Unknown'"></div></div>
-                            <div class="detail-row"><div class="detail-label">Antivirus</div><div class="detail-val" x-text="detailDevice.facts?.defender?.antivirus_enabled ? 'Enabled' : 'Disabled/Unknown'"></div></div>
-                            <div class="detail-row"><div class="detail-label">Sig Version</div><div class="detail-val mono" x-text="detailDevice.facts?.defender?.antivirus_signature_version || '-'"></div></div>
-                            <div class="detail-row"><div class="detail-label">Sig Updated</div><div class="detail-val" x-text="detailDevice.facts?.defender?.antivirus_signature_last_updated || '-'"></div></div>
-                            <div class="detail-row"><div class="detail-label">Quick Scan Age</div><div class="detail-val" x-text="(detailDevice.facts?.defender?.quick_scan_age_days ?? '-') + ' day(s)'"></div></div>
-                            <div class="detail-row"><div class="detail-label">Full Scan Age</div><div class="detail-val" x-text="(detailDevice.facts?.defender?.full_scan_age_days ?? '-') + ' day(s)'"></div></div>
+                            <template x-for="product in detailDevice.security_products || []" :key="product.name">
+                                <div class="detail-row" style="margin-bottom: 12px; padding-bottom: 12px; border-bottom: 1px solid var(--border-color);">
+                                    <div class="detail-label" x-text="product.name"></div>
+                                    <div class="detail-val">
+                                        <span class="badge" :class="product.realtime_protection_enabled ? 'online' : 'offline'" x-text="product.realtime_protection_enabled ? 'Realtime protected' : 'Realtime disabled'"></span>
+                                        <div class="small text-muted mt-1" x-text="`${product.vendor || 'Unknown vendor'} · Signature: ${product.signature_status || 'unknown'}`"></div>
+                                        <div class="small text-muted" x-text="`Detected: ${formatDate(product.detected_at)}`"></div>
+                                    </div>
+                                </div>
+                            </template>
+                            <div class="text-muted small" x-show="!(detailDevice.security_products || []).length">No Windows Security Center product reported yet. The device may be using an older agent version.</div>
+                            <div x-show="detailDevice.facts?.defender" style="margin-top: 14px;">
+                                <div class="detail-label mb-2">Microsoft Defender telemetry</div>
+                                <div class="detail-row"><div class="detail-label">Realtime</div><div class="detail-val" x-text="detailDevice.facts?.defender?.realtime_protection_enabled ? 'Enabled' : 'Passive / Disabled / Unknown'"></div></div>
+                                <div class="detail-row"><div class="detail-label">Signature</div><div class="detail-val mono" x-text="detailDevice.facts?.defender?.antivirus_signature_version || '-'"></div></div>
+                                <div class="detail-row"><div class="detail-label">Signature updated</div><div class="detail-val" x-text="detailDevice.facts?.defender?.antivirus_signature_last_updated || '-'"></div></div>
+                            </div>
                         </div>
                     </div>
 
@@ -357,70 +394,6 @@
                         </table>
                     </div>
                 </div>
-                <div class="card">
-                    <div class="table-wrapper" style="max-height: 500px;">
-                        <table>
-                            <thead><tr><th>Program Name</th><th>Version</th><th>Status</th></tr></thead>
-                            <tbody>
-                                <template x-for="sw in detailDevice.software" :key="sw.name">
-                                    <tr :class="sw.is_blacklisted ? 'bg-danger-subtle' : ''">
-                                        <td class="fw-bold" :class="sw.is_blacklisted ? 'text-danger' : ''" x-text="sw.name"></td>
-                                        <td class="mono small" x-text="sw.version"></td>
-                                        <td>
-                                            <span x-show="sw.is_blacklisted" class="badge danger">BLACKLISTED</span>
-                                            <span x-show="!sw.is_blacklisted" class="badge online">Safe</span>
-                                        </td>
-                                    </tr>
-                                </template>
-                            </tbody>
-                        </table>
-                    </div>
-                </div>
-            </div>
-
-            <!-- TAB: USB -->
-            <div x-show="activeTab==='usb'">
-                <div class="card">
-                    <div class="table-wrapper">
-                        <table>
-                            <thead><tr><th>Device Name</th><th>Type</th><th>First Detected</th></tr></thead>
-                            <tbody>
-                                <template x-for="u in detailDevice.usb" :key="u.id">
-                                    <tr>
-                                        <td class="fw-bold" x-text="u.name"></td>
-                                        <td><span class="badge usb" x-text="u.type"></span></td>
-                                        <td class="small text-muted" x-text="formatDate(u.date)"></td>
-                                    </tr>
-                                </template>
-                                <tr x-show="!detailDevice.usb?.length"><td colspan="3" class="text-center py-4">No USB devices detected.</td></tr>
-                            </tbody>
-                        </table>
-                    </div>
-                </div>
-            </div>
-
-            <!-- TAB: LOGS -->
-            <div x-show="activeTab==='logs'">
-                <div class="card">
-                    <div class="table-wrapper">
-                        <table>
-                            <thead><tr><th>Date</th><th>Type</th><th>Change Detail</th></tr></thead>
-                            <tbody>
-                                <template x-for="log in detailDevice.logs" :key="log.id">
-                                    <tr>
-                                        <td class="small mono" x-text="formatDate(log.date)"></td>
-                                        <td><span class="badge" :class="log.type==='SOFTWARE'?'software':'hardware'" x-text="log.type"></span></td>
-                                        <td>
-                                            <span class="text-muted" x-text="log.field + ': '"></span>
-                                            <span class="fw-bold" x-text="log.new"></span>
-                                        </td>
-                                    </tr>
-                                </template>
-                                <tr x-show="!detailDevice.logs?.length"><td colspan="3" class="text-center py-4">No activity logs found.</td></tr>
-                            </tbody>
-                        </table>
-                    </div>
-                </div>
             </div>
 
         </div>
@@ -435,12 +408,49 @@
     <div class="modal-overlay" x-show="showEditAssetModal" x-transition.opacity x-cloak>
         <div class="modal-content" @click.away="showEditAssetModal=false">
             <div class="modal-header">
-                <h2>📝 Edit Asset Info</h2>
+                <h2>📝 Edit Computer & Asset Info</h2>
                 <button class="close-btn" @click="showEditAssetModal=false">✕</button>
             </div>
             <div class="modal-body">
                 <div class="form-group">
-                    <label>SKU / Asset Number</label>
+                    <label>Asset Number (เลขครุภัณฑ์หลัก)</label>
+                    <input type="text" class="form-control" x-model="editAssetForm.asset_number" placeholder="ex. อบจ.1234">
+                </div>
+                <div class="form-group">
+                    <label>Building</label>
+                    <select class="form-control" x-model="editAssetForm.building_id" @change="onEditAssetBuildingChange()">
+                        <option value="">-- Select Building --</option>
+                        <template x-for="building in buildings" :key="building.id">
+                            <option :value="building.id" x-text="building.name"></option>
+                        </template>
+                    </select>
+                </div>
+                <div class="form-group">
+                    <label>Department</label>
+                    <select class="form-control" x-model="editAssetForm.department_id" @change="onEditAssetDepartmentChange()">
+                        <option value="">-- Select Department --</option>
+                        <template x-for="department in editAssetDepartments" :key="department.id">
+                            <option :value="department.id" x-text="department.name"></option>
+                        </template>
+                    </select>
+                </div>
+                <div class="form-group">
+                    <label>Location / Room</label>
+                    <select class="form-control" x-model="editAssetForm.location_id">
+                        <option value="">-- Select Location / Room --</option>
+                        <template x-for="loc in editAssetLocations" :key="loc.id">
+                            <option :value="loc.id" x-text="loc.label"></option>
+                        </template>
+                    </select>
+                    <small class="text-muted">Manage buildings, departments, and locations from Master Data.</small>
+                </div>
+                <div class="form-group d-flex align-items-center" style="gap: 10px; margin-bottom: 15px;">
+                    <input type="checkbox" id="allow_overtime_checkbox" x-model="editAssetForm.allow_overtime" style="width: 20px; height: 20px; cursor: pointer;">
+                    <label for="allow_overtime_checkbox" style="margin-bottom: 0; cursor: pointer; font-weight: bold;">Allow Overtime (ยกเว้นระบบเตือน/สั่งปิดช่วงค่ำ)</label>
+                </div>
+                <hr style="border: 0; border-top: 1px solid var(--border-color); margin: 15px 0;">
+                <div class="form-group">
+                    <label>SKU / Model ID</label>
                     <input type="text" class="form-control" x-model="editAssetForm.sku" placeholder="ex. COM-001">
                 </div>
                 <div class="form-group">
