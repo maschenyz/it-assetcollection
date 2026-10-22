@@ -20,6 +20,8 @@ document.addEventListener('alpine:init', () => {
         buildings: [],
         departments: [],
         locations: [],
+        policies: [],
+        backupRuns: [],
         newBuilding: { name: '', code: '' },
         newDepartment: { name: '', code: '', building_id: '' },
         newLocation: { building_id: '', department_id: '', room: '' },
@@ -219,9 +221,22 @@ document.addEventListener('alpine:init', () => {
                 this.departments = await res2.json();
                 const res3 = await fetch('/api/v1/master/locations', { headers: this.authHeaders });
                 this.locations = await res3.json();
+                const operations = await fetch('/api/v1/operations/policies', { headers: this.authHeaders });
+                this.policies = operations.ok ? await operations.json() : [];
+                const backups = await fetch('/api/v1/operations/backups', { headers: this.authHeaders });
+                this.backupRuns = backups.ok ? await backups.json() : [];
             } catch (err) {
                 console.error("Error loading master data:", err);
             }
+        },
+
+        async updatePolicy(policy) {
+            const res = await fetch(`/api/v1/operations/policies/${encodeURIComponent(policy.key)}`, {
+                method: 'PUT', headers: this.authHeaders, body: JSON.stringify({ value: policy.value })
+            });
+            if (!res.ok) return this.showToast(`Could not save policy: ${await res.text()}`);
+            this.showToast('Policy updated');
+            await this.loadMasterData();
         },
 
         async addBuilding() {
@@ -546,6 +561,8 @@ document.addEventListener('alpine:init', () => {
                 const metaPayload = {
                     asset_number: this.editAssetForm.asset_number || '',
                     location_id: this.editAssetForm.location_id ? parseInt(this.editAssetForm.location_id) : null,
+                    building_id: this.editAssetForm.building_id ? parseInt(this.editAssetForm.building_id) : null,
+                    department_id: this.editAssetForm.department_id ? parseInt(this.editAssetForm.department_id) : null,
                     allow_overtime: !!this.editAssetForm.allow_overtime
                 };
                 const metaRes = await fetch(`/api/v1/devices/${this.detailDevice.uuid}`, {
@@ -579,6 +596,7 @@ document.addEventListener('alpine:init', () => {
                 if (res.ok) {
                     this.showToast('💾 อัปเดตข้อมูลคอมพิวเตอร์และทรัพย์สินเรียบร้อยแล้วค่ะ!');
                     this.showEditAssetModal = false;
+                    await this.loadMasterData();
                     const updatedRes = await fetch(`/api/v1/devices/${this.detailDevice.uuid}`, { headers: this.authHeaders });
                     this.detailDevice = { ...await updatedRes.json(), _loading: false };
                     await this.refreshData();

@@ -218,6 +218,7 @@ func logChange(deviceID, ctype, field, oldV, newV string) {
 // --- Models ---
 type AgentCheckin struct {
 	UUID         string                   `json:"uuid"`
+	AgentVersion string                   `json:"agent_version"`
 	Hostname     string                   `json:"hostname"`
 	DeviceType   string                   `json:"device_type"`
 	IPAddress    string                   `json:"ip_address"`
@@ -287,6 +288,66 @@ func upsertSecurityProducts(deviceID string, facts map[string]interface{}) {
 		if err != nil {
 			log.Printf("[Security] upsert error device=%s product=%q: %v", deviceID, name, err)
 		}
+	}
+}
+
+func refreshDeviceHealth(deviceID string) {
+	var protected, signatureOutdated, diskFailed bool
+	var agentVersion, status string
+	var oldScore int
+	var oldLevel string
+	_ = db.QueryRow("SELECT score, level FROM asset.device_health WHERE device_id = $1", deviceID).Scan(&oldScore, &oldLevel)
+	_ = db.QueryRow(`SELECT
+		COALESCE((SELECT bool_or(realtime_protection_enabled) FROM asset.security_products WHERE device_id = d.uuid), false),
+		COALESCE((SELECT bool_or(signature_status = 'outdated') FROM asset.security_products WHERE device_id = d.uuid), false),
+		COALESCE((SELECT bool_or((disk->>'predict_failure')::boolean) FROM asset.hardware_inventory h, jsonb_array_elements(CASE WHEN jsonb_typeof(h.storage_info) = 'array' THEN h.storage_info ELSE '[]'::jsonb END) disk WHERE h.device_id = d.uuid), false),
+		COALESCE(d.agent_version, ''), d.status
+		FROM asset.devices d WHERE d.uuid = $1`, deviceID).Scan(&protected, &signatureOutdated, &diskFailed, &agentVersion, &status)
+	minimumScore := 80
+	_ = db.QueryRow("SELECT COALESCE((SELECT value::int FROM asset.policy_settings WHERE key = 'minimum_health_score'), 80)").Scan(&minimumScore)
+	if minimumScore < 1 || minimumScore > 100 {
+		minimumScore = 80
+	}
+	score := 100
+	issues := []string{}
+	if !protected {
+		score -= 30
+		issues = append(issues, "No active antivirus reported")
+	}
+	if signatureOutdated {
+		score -= 15
+		issues = append(issues, "Antivirus signature is outdated")
+	}
+	if diskFailed {
+		score -= 40
+		issues = append(issues, "Disk S.M.A.R.T. predicts failure")
+	}
+	if status != "ONLINE" {
+		score -= 10
+		issues = append(issues, "Device is offline")
+	}
+	if agentVersion == "" {
+		score -= 10
+		issues = append(issues, "Agent version not reported")
+	}
+	if score < 0 {
+		score = 0
+	}
+	level := "healthy"
+	if score < 60 {
+		level = "critical"
+	} else if score < minimumScore {
+		level = "warning"
+	}
+	_, err := db.Exec(`INSERT INTO asset.device_health (device_id, score, level, issues, evaluated_at)
+		VALUES ($1, $2, $3, $4, CURRENT_TIMESTAMP)
+		ON CONFLICT (device_id) DO UPDATE SET score = EXCLUDED.score, level = EXCLUDED.level, issues = EXCLUDED.issues, evaluated_at = CURRENT_TIMESTAMP`,
+		deviceID, score, level, toJSON(issues))
+	if err != nil {
+		log.Printf("[Health] update error device=%s: %v", deviceID, err)
+	}
+	if oldLevel != "" && (oldLevel != level || oldScore != score) {
+		logChange(deviceID, "HEALTH", "Health score", fmt.Sprintf("%d (%s)", oldScore, oldLevel), fmt.Sprintf("%d (%s)", score, level))
 	}
 }
 
@@ -594,6 +655,7 @@ func main() {
 	db.Exec("ALTER TABLE asset.printers ADD COLUMN IF NOT EXISTS ip TEXT DEFAULT '';")
 	db.Exec("ALTER TABLE asset.printers ADD COLUMN IF NOT EXISTS total_pages_printed INT DEFAULT 0;")
 	db.Exec("ALTER TABLE asset.devices ADD COLUMN IF NOT EXISTS asset_number TEXT DEFAULT '';")
+	db.Exec("ALTER TABLE asset.devices ADD COLUMN IF NOT EXISTS agent_version TEXT DEFAULT '';")
 	db.Exec("ALTER TABLE asset.hardware_inventory ADD COLUMN IF NOT EXISTS bios_info JSONB DEFAULT '{}';")
 	// Ensure ON CONFLICT (device_id, printer_name) works even on older schemas
 	db.Exec("CREATE UNIQUE INDEX IF NOT EXISTS idx_printers_device_name_unique ON asset.printers (device_id, printer_name);")
@@ -617,6 +679,9 @@ func main() {
 		manufacturer TEXT DEFAULT '',
 		created_at TIMESTAMPTZ DEFAULT CURRENT_TIMESTAMP
 	);`)
+	// Older schema versions used size_cm while the API stores the normalized
+	// display value in inches. Keep both columns during the transition.
+	db.Exec("ALTER TABLE asset.monitors ADD COLUMN IF NOT EXISTS size_inch INTEGER DEFAULT 0;")
 	db.Exec(`CREATE TABLE IF NOT EXISTS asset.device_facts (
 		device_id TEXT PRIMARY KEY REFERENCES asset.devices(uuid) ON DELETE CASCADE,
 		facts JSONB DEFAULT '{}'::jsonb,
@@ -636,6 +701,28 @@ func main() {
 		UNIQUE(device_id, product_name)
 	);`)
 	db.Exec("CREATE INDEX IF NOT EXISTS idx_security_products_device ON asset.security_products(device_id, detected_at DESC);")
+	db.Exec(`CREATE TABLE IF NOT EXISTS asset.device_health (
+		device_id TEXT PRIMARY KEY REFERENCES asset.devices(uuid) ON DELETE CASCADE,
+		score INTEGER NOT NULL DEFAULT 0,
+		level TEXT NOT NULL DEFAULT 'unknown',
+		issues JSONB DEFAULT '[]'::jsonb,
+		evaluated_at TIMESTAMPTZ DEFAULT CURRENT_TIMESTAMP
+	);`)
+	db.Exec(`CREATE TABLE IF NOT EXISTS asset.policy_settings (
+		key TEXT PRIMARY KEY, value TEXT NOT NULL DEFAULT '', description TEXT DEFAULT '', updated_at TIMESTAMPTZ DEFAULT CURRENT_TIMESTAMP
+	);`)
+	db.Exec(`CREATE TABLE IF NOT EXISTS asset.device_policy_exceptions (
+		id BIGSERIAL PRIMARY KEY, device_id TEXT REFERENCES asset.devices(uuid) ON DELETE CASCADE,
+		policy_key TEXT NOT NULL, reason TEXT DEFAULT '', expires_at TIMESTAMPTZ NULL, created_at TIMESTAMPTZ DEFAULT CURRENT_TIMESTAMP,
+		UNIQUE(device_id, policy_key)
+	);`)
+	db.Exec(`CREATE TABLE IF NOT EXISTS asset.backup_runs (
+		id BIGSERIAL PRIMARY KEY, status TEXT NOT NULL DEFAULT 'unknown', backup_path TEXT DEFAULT '', details TEXT DEFAULT '',
+		started_at TIMESTAMPTZ DEFAULT CURRENT_TIMESTAMP, completed_at TIMESTAMPTZ NULL
+	);`)
+	db.Exec(`INSERT INTO asset.policy_settings (key, value, description) VALUES
+		('minimum_health_score', '80', 'Minimum health score before a device needs attention'),
+		('required_security_product', '', 'Optional security product required by policy') ON CONFLICT (key) DO NOTHING;`)
 
 	// 3. Init Fiber App
 	app := fiber.New(fiber.Config{
@@ -670,14 +757,14 @@ func main() {
 
 		// 1. Update Device Info
 		_, err = tx.Exec(`
-			INSERT INTO asset.devices (uuid, hostname, device_type, mac_address, ip_address, os_info, windows_build, bios_serial, last_user, status, last_seen)
-			VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, 'ONLINE', CURRENT_TIMESTAMP)
+			INSERT INTO asset.devices (uuid, hostname, device_type, mac_address, ip_address, os_info, windows_build, bios_serial, last_user, agent_version, status, last_seen)
+			VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10, 'ONLINE', CURRENT_TIMESTAMP)
 			ON CONFLICT (uuid) DO UPDATE SET
 				hostname = EXCLUDED.hostname, ip_address = EXCLUDED.ip_address,
 				os_info = EXCLUDED.os_info, windows_build = EXCLUDED.windows_build,
-				bios_serial = EXCLUDED.bios_serial, last_user = EXCLUDED.last_user,
+				bios_serial = EXCLUDED.bios_serial, last_user = EXCLUDED.last_user, agent_version = EXCLUDED.agent_version,
 				status = 'ONLINE', last_seen = CURRENT_TIMESTAMP;
-		`, payload.UUID, hostname, payload.DeviceType, payload.MACAddress, ipAddress, toJSON(payload.OSInfo), payload.WindowsBuild, biosSerial, lastUser)
+		`, payload.UUID, hostname, payload.DeviceType, payload.MACAddress, ipAddress, toJSON(payload.OSInfo), payload.WindowsBuild, biosSerial, lastUser, cleanString(payload.AgentVersion))
 		if err != nil {
 			log.Printf("[AgentCheckin] devices upsert error uuid=%s: %v", payload.UUID, err)
 			return c.Status(500).SendString(err.Error())
@@ -994,6 +1081,7 @@ func main() {
 			}
 		}
 		upsertSecurityProducts(payload.UUID, payload.Facts)
+		refreshDeviceHealth(payload.UUID)
 
 		// 7. Monitors (outside tx — full replace strategy)
 		go upsertMonitors(payload.UUID, payload.Monitors)
@@ -1471,7 +1559,7 @@ func main() {
 		rows, err := db.Query(`
 			SELECT 
 				d.uuid, d.hostname, d.ip_address, d.mac_address, d.os_info, d.windows_build,
-				d.bios_serial, d.last_user, d.status, d.last_seen, d.device_type, COALESCE(d.asset_number, '') as asset_number, d.allow_overtime,
+				d.bios_serial, d.last_user, d.status, d.last_seen, d.device_type, COALESCE(d.asset_number, '') as asset_number, d.allow_overtime, COALESCE(d.agent_version, ''),
 				COALESCE(b.name, '') as building_name,
 				COALESCE(dept.name, '') as department_name,
 				COALESCE(df.facts->'defender'->>'antivirus_enabled', 'false') as av_enabled,
@@ -1480,9 +1568,12 @@ func main() {
 				COALESCE(sec.vendor, '') as security_vendor,
 				COALESCE(sec.realtime_protection_enabled, NULLIF(df.facts->'defender'->>'realtime_protection_enabled', '')::boolean, false) as security_protected,
 				COALESCE(sec.signature_status, '') as security_signature_status,
+				COALESCE(dh.score, 0) as health_score, COALESCE(dh.level, 'unknown') as health_level,
 				COALESCE(h.cpu_info->>'name', '') as cpu_name,
 				COALESCE((SELECT SUM((val->>'capacity_gb')::numeric) FROM jsonb_array_elements(CASE WHEN jsonb_typeof(h.ram_info) = 'array' THEN h.ram_info ELSE '[]'::jsonb END) as val), 0) as ram_gb,
 				COALESCE((SELECT SUM((val->>'size_gb')::numeric) FROM jsonb_array_elements(CASE WHEN jsonb_typeof(h.storage_info) = 'array' THEN h.storage_info ELSE '[]'::jsonb END) as val), 0) as storage_gb,
+				COALESCE((SELECT SUM((val->>'used_gb')::numeric) FROM jsonb_array_elements(CASE WHEN jsonb_typeof(df.facts->'storage_volumes') = 'array' THEN df.facts->'storage_volumes' ELSE '[]'::jsonb END) as val), 0) as storage_used_gb,
+				COALESCE((SELECT SUM((val->>'free_gb')::numeric) FROM jsonb_array_elements(CASE WHEN jsonb_typeof(df.facts->'storage_volumes') = 'array' THEN df.facts->'storage_volumes' ELSE '[]'::jsonb END) as val), 0) as storage_free_gb,
 				(SELECT COUNT(*) FROM asset.software_installations si WHERE si.device_id = d.uuid) as software_count,
 				EXISTS(SELECT 1 FROM asset.software_installations si JOIN asset.software_catalog sc ON si.software_id = sc.id WHERE si.device_id = d.uuid AND sc.software_name ILIKE '%HOSxP%') as has_hosxp,
 				COALESCE((SELECT json_agg(json_build_object('name', p.printer_name, 'brand', p.brand, 'type', p.printer_type, 'last_seen', p.last_seen_at)) FROM asset.printers p WHERE p.device_id = d.uuid), '[]'::json) as connected_printers,
@@ -1494,6 +1585,7 @@ func main() {
 			LEFT JOIN asset.departments dept ON l.department_id = dept.id
 			LEFT JOIN asset.device_facts df ON d.uuid = df.device_id
 			LEFT JOIN asset.hardware_inventory h ON d.uuid = h.device_id
+			LEFT JOIN asset.device_health dh ON d.uuid = dh.device_id
 			LEFT JOIN LATERAL (
 				SELECT product_name, vendor, realtime_protection_enabled, signature_status
 				FROM asset.security_products sp WHERE sp.device_id = d.uuid
@@ -1508,18 +1600,19 @@ func main() {
 
 		var result []fiber.Map
 		for rows.Next() {
-			var uuid, hostname, ip, mac, winBuild, biosSerial, lastUser, status, devType, assetNumber, bName, deptName, avEnabled, avVersion, securityName, securityVendor, securitySignatureStatus string
+			var uuid, hostname, ip, mac, winBuild, biosSerial, lastUser, status, devType, assetNumber, agentVersion, bName, deptName, avEnabled, avVersion, securityName, securityVendor, securitySignatureStatus, healthLevel string
 			var cpuName, screenSizes string
 			var connectedPrintersJSON []byte
-			var ramGb, storageGb float64
+			var ramGb, storageGb, storageUsedGb, storageFreeGb float64
+			var healthScore int
 			var softwareCount int
 			var hasHosxp, allowOvertime, diskFailed, securityProtected bool
 			var osInfo []byte
 			var lastSeen *time.Time
 
 			err = rows.Scan(
-				&uuid, &hostname, &ip, &mac, &osInfo, &winBuild, &biosSerial, &lastUser, &status, &lastSeen, &devType, &assetNumber, &allowOvertime, &bName, &deptName, &avEnabled, &avVersion, &securityName, &securityVendor, &securityProtected, &securitySignatureStatus,
-				&cpuName, &ramGb, &storageGb, &softwareCount, &hasHosxp, &connectedPrintersJSON, &screenSizes, &diskFailed,
+				&uuid, &hostname, &ip, &mac, &osInfo, &winBuild, &biosSerial, &lastUser, &status, &lastSeen, &devType, &assetNumber, &allowOvertime, &agentVersion, &bName, &deptName, &avEnabled, &avVersion, &securityName, &securityVendor, &securityProtected, &securitySignatureStatus, &healthScore, &healthLevel,
+				&cpuName, &ramGb, &storageGb, &storageUsedGb, &storageFreeGb, &softwareCount, &hasHosxp, &connectedPrintersJSON, &screenSizes, &diskFailed,
 			)
 			if err != nil {
 				log.Printf("[DevicesList] Scan error: %v", err)
@@ -1563,15 +1656,18 @@ func main() {
 				"security_vendor":           securityVendor,
 				"security_protected":        securityProtected,
 				"security_signature_status": securitySignatureStatus,
-				"cpu_name":                  cpuName,
-				"ram_gb":                    ramGb,
-				"storage_gb":                storageGb,
-				"software_count":            softwareCount,
-				"has_hosxp":                 hasHosxp,
-				"allow_overtime":            allowOvertime,
-				"disk_failed":               diskFailed,
-				"connected_printers":        printersList,
-				"screen_sizes":              screenSizes,
+				"health_score":              healthScore, "health_level": healthLevel, "agent_version": agentVersion,
+				"cpu_name":           cpuName,
+				"ram_gb":             ramGb,
+				"storage_gb":         storageGb,
+				"storage_used_gb":    storageUsedGb,
+				"storage_free_gb":    storageFreeGb,
+				"software_count":     softwareCount,
+				"has_hosxp":          hasHosxp,
+				"allow_overtime":     allowOvertime,
+				"disk_failed":        diskFailed,
+				"connected_printers": printersList,
+				"screen_sizes":       screenSizes,
 			})
 		}
 
@@ -1714,7 +1810,8 @@ func main() {
 	v1.Get("/devices/:uuid", verifyAdmin, func(c *fiber.Ctx) error {
 		uuid := c.Params("uuid")
 
-		var hostname, ip, mac, winBuild, biosSerial, lastUser, status, devType, assetNumber string
+		var hostname, ip, mac, winBuild, biosSerial, lastUser, status, devType, assetNumber, agentVersion, healthLevel string
+		var healthScore int
 		var locationID *int
 		var allowOvertime bool
 		var bName, deptName string
@@ -1724,16 +1821,17 @@ func main() {
 			SELECT 
 				d.uuid, d.hostname, d.ip_address, d.mac_address, d.os_info, d.windows_build,
 				d.bios_serial, d.last_user, d.status, d.last_seen, d.device_type, 
-				COALESCE(d.asset_number, '') as asset_number, d.location_id, d.allow_overtime,
+				COALESCE(d.asset_number, '') as asset_number, d.location_id, d.allow_overtime, COALESCE(d.agent_version, ''), COALESCE(dh.score, 0), COALESCE(dh.level, 'unknown'),
 				COALESCE(b.name, '') as building_name,
 				COALESCE(dept.name, '') as department_name
 			FROM asset.devices d
 			LEFT JOIN asset.locations l ON d.location_id = l.id
 			LEFT JOIN asset.buildings b ON l.building_id = b.id
 			LEFT JOIN asset.departments dept ON l.department_id = dept.id
+			LEFT JOIN asset.device_health dh ON d.uuid = dh.device_id
 			WHERE d.uuid = $1`, uuid).Scan(
 			&uuid, &hostname, &ip, &mac, &osInfo, &winBuild,
-			&biosSerial, &lastUser, &status, &lastSeen, &devType, &assetNumber, &locationID, &allowOvertime,
+			&biosSerial, &lastUser, &status, &lastSeen, &devType, &assetNumber, &locationID, &allowOvertime, &agentVersion, &healthScore, &healthLevel,
 			&bName, &deptName)
 		if err != nil {
 			return c.Status(404).JSON(fiber.Map{"error": "Device not found"})
@@ -1906,7 +2004,8 @@ func main() {
 			"status": status, "last_seen": lastSeenStr, "device_type": devType,
 			"asset_number": assetNumber, "location_id": locationID,
 			"allow_overtime": allowOvertime,
-			"building_name":  bName, "department_name": deptName,
+			"agent_version":  agentVersion, "health_score": healthScore, "health_level": healthLevel,
+			"building_name": bName, "department_name": deptName,
 			"hardware": fiber.Map{
 				"cpu": cpu, "ram": ram, "storage": storage,
 				"gpu": gpu, "motherboard": mb, "bios": bios,
@@ -1971,12 +2070,14 @@ func main() {
 		return c.SendString("Asset data updated")
 	})
 
-	// PUT /devices/:uuid — Update computer metadata (asset_number, location_id, allow_overtime)
+	// PUT /devices/:uuid — Update computer metadata and its building/department location
 	v1.Put("/devices/:uuid", verifyAdmin, func(c *fiber.Ctx) error {
 		uuid := c.Params("uuid")
 		var req struct {
 			AssetNumber   string `json:"asset_number"`
 			LocationID    *int   `json:"location_id"`
+			BuildingID    *int   `json:"building_id"`
+			DepartmentID  *int   `json:"department_id"`
 			AllowOvertime *bool  `json:"allow_overtime"`
 		}
 		if err := c.BodyParser(&req); err != nil {
@@ -1993,10 +2094,49 @@ func main() {
 			allowOvertimeVal = *req.AllowOvertime
 		}
 
+		locationID := req.LocationID
+		if locationID == nil && (req.BuildingID != nil || req.DepartmentID != nil) {
+			if req.DepartmentID != nil {
+				var departmentBuilding sql.NullInt64
+				if err := db.QueryRow("SELECT building_id FROM asset.departments WHERE id = $1", *req.DepartmentID).Scan(&departmentBuilding); err != nil {
+					return c.Status(400).SendString("Department not found")
+				}
+				if req.BuildingID == nil && departmentBuilding.Valid {
+					buildingID := int(departmentBuilding.Int64)
+					req.BuildingID = &buildingID
+				}
+				if req.BuildingID != nil && departmentBuilding.Valid && *req.BuildingID != int(departmentBuilding.Int64) {
+					return c.Status(400).SendString("Department does not belong to the selected building")
+				}
+			}
+
+			var existingLocationID int
+			err := db.QueryRow(`
+				SELECT id FROM asset.locations
+				WHERE building_id IS NOT DISTINCT FROM $1
+				  AND department_id IS NOT DISTINCT FROM $2
+				  AND room = ''
+				ORDER BY id
+				LIMIT 1`, req.BuildingID, req.DepartmentID).Scan(&existingLocationID)
+			if err == nil {
+				locationID = &existingLocationID
+			} else if err == sql.ErrNoRows {
+				if err := db.QueryRow(`
+					INSERT INTO asset.locations (building_id, department_id, room)
+					VALUES ($1, $2, '')
+					RETURNING id`, req.BuildingID, req.DepartmentID).Scan(&existingLocationID); err != nil {
+					return c.Status(500).SendString(err.Error())
+				}
+				locationID = &existingLocationID
+			} else {
+				return c.Status(500).SendString(err.Error())
+			}
+		}
+
 		_, err := db.Exec(`
 			UPDATE asset.devices
 			SET asset_number = $1, location_id = $2, allow_overtime = $3
-			WHERE uuid = $4`, req.AssetNumber, req.LocationID, allowOvertimeVal, uuid)
+			WHERE uuid = $4`, req.AssetNumber, locationID, allowOvertimeVal, uuid)
 		if err != nil {
 			return c.Status(500).SendString(err.Error())
 		}
@@ -2010,8 +2150,8 @@ func main() {
 			oldLocStr = fmt.Sprintf("ID:%d", *oldLocationID)
 		}
 		newLocStr := "None"
-		if req.LocationID != nil {
-			newLocStr = fmt.Sprintf("ID:%d", *req.LocationID)
+		if locationID != nil {
+			newLocStr = fmt.Sprintf("ID:%d", *locationID)
 		}
 		if oldLocStr != newLocStr {
 			logChange(uuid, "METADATA", "Location ID", oldLocStr, newLocStr)
@@ -2514,6 +2654,60 @@ func main() {
 			return c.Status(404).SendString("Location not found")
 		}
 		return c.SendString("Deleted")
+	})
+
+	// Operations policy and governance settings.
+	v1.Get("/operations/policies", verifyAdmin, func(c *fiber.Ctx) error {
+		rows, err := db.Query("SELECT key, value, description, updated_at FROM asset.policy_settings ORDER BY key")
+		if err != nil {
+			return c.Status(500).SendString(err.Error())
+		}
+		defer rows.Close()
+		result := []fiber.Map{}
+		for rows.Next() {
+			var key, value, description string
+			var updated time.Time
+			rows.Scan(&key, &value, &description, &updated)
+			result = append(result, fiber.Map{"key": key, "value": value, "description": description, "updated_at": updated.Format(time.RFC3339)})
+		}
+		return c.JSON(result)
+	})
+	v1.Put("/operations/policies/:key", verifyAdmin, func(c *fiber.Ctx) error {
+		var req struct {
+			Value string `json:"value"`
+		}
+		if err := c.BodyParser(&req); err != nil {
+			return c.Status(400).SendString("Invalid policy value")
+		}
+		result, err := db.Exec("UPDATE asset.policy_settings SET value = $1, updated_at = CURRENT_TIMESTAMP WHERE key = $2", strings.TrimSpace(req.Value), c.Params("key"))
+		if err != nil {
+			return c.Status(500).SendString(err.Error())
+		}
+		affected, _ := result.RowsAffected()
+		if affected == 0 {
+			return c.Status(404).SendString("Policy not found")
+		}
+		return c.SendString("Updated")
+	})
+	v1.Get("/operations/backups", verifyAdmin, func(c *fiber.Ctx) error {
+		rows, err := db.Query("SELECT status, backup_path, details, started_at, completed_at FROM asset.backup_runs ORDER BY started_at DESC LIMIT 20")
+		if err != nil {
+			return c.Status(500).SendString(err.Error())
+		}
+		defer rows.Close()
+		result := []fiber.Map{}
+		for rows.Next() {
+			var status, path, details string
+			var started time.Time
+			var completed *time.Time
+			rows.Scan(&status, &path, &details, &started, &completed)
+			item := fiber.Map{"status": status, "path": path, "details": details, "started_at": started.Format(time.RFC3339)}
+			if completed != nil {
+				item["completed_at"] = completed.Format(time.RFC3339)
+			}
+			result = append(result, item)
+		}
+		return c.JSON(result)
 	})
 
 	// --- 8. PRINTERS ---

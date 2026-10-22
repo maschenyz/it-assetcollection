@@ -42,6 +42,7 @@
                     <col style="width: 40px;">
                     <col style="width: 110px;">
                     <col style="width: 160px;">
+                    <col style="width: 130px;">
                     <col style="width: 155px;">
                     <col style="width: 230px;">
                     <col style="width: 100px;">
@@ -60,6 +61,7 @@
                         </th>
                         <th>Asset #</th>
                         <th>Device (Type)</th>
+                        <th>IP Address</th>
                         <th>Building / Department</th>
                         <th>Specs (CPU / RAM / Storage)</th>
                         <th>Monitor Size</th>
@@ -95,8 +97,11 @@
                                           x-text="dev.device_type || 'PC'">
                                     </span>
                                 </div>
-                                <div class="mono small text-muted" style="margin-top: 4px; font-size: 11px;" x-text="dev.ip_address"></div>
+                                <div style="margin-top: 5px;">
+                                    <span class="badge" style="font-size: 10px; padding: 2px 6px;" :class="dev.health_level === 'healthy' ? 'online' : (dev.health_level === 'critical' ? 'offline' : 'hardware')" x-text="`Health ${dev.health_score ?? '-'}%`"></span>
+                                </div>
                             </td>
+                            <td class="mono small" style="vertical-align: top; padding: 12px 10px; word-break: break-all;" x-text="dev.ip_address || '-' "></td>
                             <td style="vertical-align: top; padding: 12px 10px;">
                                 <div class="small fw-bold" x-text="dev.building_name || '-'"></div>
                                 <div class="small text-muted" style="margin-top: 4px; font-size: 11px;" x-text="dev.department_name || '-' "></div>
@@ -104,6 +109,7 @@
                             <td style="vertical-align: top; padding: 12px 10px;">
                                 <div class="small fw-bold" style="word-break: break-word;" x-text="dev.cpu_name || '-'"></div>
                                 <div class="small text-muted" style="margin-top: 4px; font-size: 11px;" x-text="'RAM: ' + (dev.ram_gb ? Math.round(dev.ram_gb) + ' GB' : '-') + ' / Disk: ' + (dev.storage_gb ? Math.round(dev.storage_gb) + ' GB' : '-')"></div>
+                                <div class="small" style="margin-top: 3px; font-size: 11px;" x-show="dev.storage_used_gb || dev.storage_free_gb" x-text="`Used ${Math.round(dev.storage_used_gb || 0)} GB · Free ${Math.round(dev.storage_free_gb || 0)} GB`"></div>
                             </td>
                             <td style="vertical-align: top; padding: 12px 10px;">
                                 <span class="small" x-text="dev.screen_sizes ? dev.screen_sizes.replaceAll('inc', '\"') : '-'"></span>

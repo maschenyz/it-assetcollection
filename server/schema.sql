@@ -58,6 +58,7 @@ CREATE TABLE IF NOT EXISTS asset.devices (
     last_user TEXT DEFAULT '',
     location_id INTEGER REFERENCES asset.locations(id) ON DELETE SET NULL,
     allow_overtime BOOLEAN DEFAULT FALSE,
+    agent_version TEXT DEFAULT '',
     status VARCHAR(20) DEFAULT 'OFFLINE',
     last_seen TIMESTAMPTZ NULL,
     created_at TIMESTAMPTZ DEFAULT CURRENT_TIMESTAMP
@@ -103,6 +104,40 @@ CREATE TABLE IF NOT EXISTS asset.security_products (
     UNIQUE(device_id, product_name)
 );
 
+CREATE TABLE IF NOT EXISTS asset.device_health (
+    device_id TEXT PRIMARY KEY REFERENCES asset.devices(uuid) ON DELETE CASCADE,
+    score INTEGER NOT NULL DEFAULT 0,
+    level TEXT NOT NULL DEFAULT 'unknown',
+    issues JSONB DEFAULT '[]'::jsonb,
+    evaluated_at TIMESTAMPTZ DEFAULT CURRENT_TIMESTAMP
+);
+
+CREATE TABLE IF NOT EXISTS asset.policy_settings (
+    key TEXT PRIMARY KEY,
+    value TEXT NOT NULL DEFAULT '',
+    description TEXT DEFAULT '',
+    updated_at TIMESTAMPTZ DEFAULT CURRENT_TIMESTAMP
+);
+
+CREATE TABLE IF NOT EXISTS asset.device_policy_exceptions (
+    id BIGSERIAL PRIMARY KEY,
+    device_id TEXT REFERENCES asset.devices(uuid) ON DELETE CASCADE,
+    policy_key TEXT NOT NULL,
+    reason TEXT DEFAULT '',
+    expires_at TIMESTAMPTZ NULL,
+    created_at TIMESTAMPTZ DEFAULT CURRENT_TIMESTAMP,
+    UNIQUE(device_id, policy_key)
+);
+
+CREATE TABLE IF NOT EXISTS asset.backup_runs (
+    id BIGSERIAL PRIMARY KEY,
+    status TEXT NOT NULL DEFAULT 'unknown',
+    backup_path TEXT DEFAULT '',
+    details TEXT DEFAULT '',
+    started_at TIMESTAMPTZ DEFAULT CURRENT_TIMESTAMP,
+    completed_at TIMESTAMPTZ NULL
+);
+
 CREATE TABLE IF NOT EXISTS asset.device_assets (
     device_id TEXT PRIMARY KEY REFERENCES asset.devices(uuid) ON DELETE CASCADE,
     sku TEXT DEFAULT '',
@@ -124,6 +159,7 @@ CREATE TABLE IF NOT EXISTS asset.monitors (
     serial TEXT DEFAULT '',
     model TEXT DEFAULT '',
     size_cm INTEGER DEFAULT 0,
+    size_inch INTEGER DEFAULT 0,
     resolution TEXT DEFAULT '',
     manufacturer TEXT DEFAULT '',
     created_at TIMESTAMPTZ DEFAULT CURRENT_TIMESTAMP

@@ -4,7 +4,7 @@ import threading
 from core.config import load_config
 from core import logger
 from collectors.base import get_hw_uuid
-from collectors.hardware import get_system_info, get_hardware_info, collect_monitors
+from collectors.hardware import get_system_info, get_hardware_info, collect_monitors, collect_storage_volumes
 from collectors.software import get_software_list
 from collectors.network import get_network_info, get_system_stats, get_wifi_ssid
 from collectors.usb import get_usb_devices
@@ -22,12 +22,16 @@ from collectors.windows import (
 )
 from tasks.executor import execute_command
 
+AGENT_VERSION = "3.1.0"
+
 def collect_payload():
     """Gathers all telemetry details from collectors into a single checkin payload"""
     sys_info = get_system_info()
     hw_info = get_hardware_info()
     net_info = get_network_info()
     stats = get_system_stats()  # Real stats including psutil disk usage
+    storage_volumes = collect_storage_volumes()
+    logger.info("Storage", f"Collected {len(storage_volumes)} logical volume(s)")
     
     # Inject network connection type into sys_info (saved as JSONB os_info on server)
     sys_info["connection_type"] = net_info.get("type", "LAN")
@@ -37,6 +41,7 @@ def collect_payload():
     
     return {
         "uuid": get_hw_uuid(),
+        "agent_version": AGENT_VERSION,
         "hostname": sys_info["hostname"],
         "device_type": "Workstation",
         "ip_address": net_info["ip"],
@@ -60,6 +65,7 @@ def collect_payload():
             "network_adapters": get_network_adapters(),
             "wifi": get_wifi_status(),
             "smart": get_smart_status(),
+            "storage_volumes": storage_volumes,
             "logged_on_users": get_logged_on_users(),
         },
     }

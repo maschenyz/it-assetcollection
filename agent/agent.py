@@ -10,7 +10,7 @@ from tasks.runner import collect_payload, sync_loop, poll_loop
 from tasks.executor import execute_command
 from core import logger
 
-AGENT_VERSION = "3.0.0"
+AGENT_VERSION = "3.1.0"
 
 def parse_version(v_str):
     try:

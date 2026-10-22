@@ -82,4 +82,29 @@
             </table></div>
         </div>
     </div>
+
+    <div class="detail-grid-3 mt-3">
+        <div class="hw-card" style="grid-column: span 2;">
+            <div class="hw-card-title">Operations Policies</div>
+            <div class="p-2">
+                <template x-for="policy in policies" :key="policy.key">
+                    <div class="d-flex align-items-center mb-2" style="gap: 10px;">
+                        <div style="flex: 1;"><div class="fw-bold" x-text="policy.key"></div><div class="small text-muted" x-text="policy.description"></div></div>
+                        <input class="search-input" style="width: 110px;" x-model="policy.value">
+                        <button class="btn-sm btn-primary" @click="updatePolicy(policy)">Save</button>
+                    </div>
+                </template>
+                <div x-show="!policies.length" class="small text-muted">No policies loaded.</div>
+            </div>
+        </div>
+        <div class="hw-card">
+            <div class="hw-card-title">Backup Visibility</div>
+            <div class="p-2">
+                <template x-if="backupRuns.length">
+                    <div><div class="fw-bold" x-text="backupRuns[0].status"></div><div class="small text-muted" x-text="backupRuns[0].completed_at || backupRuns[0].started_at"></div><div class="small" x-text="backupRuns[0].details || backupRuns[0].path || '-' "></div></div>
+                </template>
+                <div x-show="!backupRuns.length" class="small text-muted">No backup run has been recorded yet.</div>
+            </div>
+        </div>
+    </div>
 </section>

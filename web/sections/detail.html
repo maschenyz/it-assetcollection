@@ -32,6 +32,10 @@
                     <div class="stat-label">Last Check-in</div>
                     <div class="stat-value small" x-text="formatDate(detailDevice.last_seen)"></div>
                 </div>
+                <div class="stat-card">
+                    <div class="stat-label">Agent</div>
+                    <div class="stat-value small" x-text="detailDevice.agent_version || 'Legacy agent'"></div>
+                </div>
             </div>
 
             <!-- TABS NAVIGATION -->
@@ -159,6 +163,41 @@
                                         </td>
                                     </tr>
                                 </template>
+                            </tbody>
+                        </table>
+                    </div>
+                </div>
+            </div>
+
+                <div class="card mb-3">
+                    <div class="card-header"><h3 class="card-title">💾 Storage Capacity</h3></div>
+                    <div class="table-wrapper">
+                        <table>
+                            <thead><tr><th>Drive</th><th>Label</th><th>Total</th><th>Used</th><th>Free</th><th>Usage</th></tr></thead>
+                            <tbody>
+                                <template x-for="(volume, i) in (detailDevice.facts?.storage_volumes || [])" :key="i">
+                                    <tr>
+                                        <td class="fw-bold" x-text="volume.drive || '-' "></td>
+                                        <td x-text="volume.label || '-' "></td>
+                                        <td x-text="`${Number(volume.size_gb || 0).toFixed(1)} GB`"></td>
+                                        <td x-text="`${Number(volume.used_gb || 0).toFixed(1)} GB`"></td>
+                                        <td x-text="`${Number(volume.free_gb || 0).toFixed(1)} GB`"></td>
+                                        <td><span class="badge" :class="Number(volume.usage_percent || 0) >= 90 ? 'offline' : (Number(volume.usage_percent || 0) >= 75 ? 'hardware' : 'online')" x-text="`${Number(volume.usage_percent || 0).toFixed(1)}%`"></span></td>
+                                    </tr>
+                                </template>
+                                <template x-if="!(detailDevice.facts?.storage_volumes || []).length">
+                                    <template x-for="(disk, i) in (detailDevice.hardware?.storage || [])" :key="'physical-' + i">
+                                        <tr>
+                                            <td class="fw-bold" x-text="disk.model || '-' "></td>
+                                            <td x-text="disk.media_type || disk.interface || 'Physical disk'"></td>
+                                            <td x-text="`${Number(disk.size_gb || 0).toFixed(1)} GB`"></td>
+                                            <td class="text-muted">Not reported</td>
+                                            <td class="text-muted">Not reported</td>
+                                            <td><span class="badge virtual">Physical inventory</span></td>
+                                        </tr>
+                                    </template>
+                                </template>
+                                <tr x-show="!(detailDevice.facts?.storage_volumes || []).length && !(detailDevice.hardware?.storage || []).length"><td colspan="6" class="text-center py-3 text-muted">No storage data reported yet.</td></tr>
                             </tbody>
                         </table>
                     </div>

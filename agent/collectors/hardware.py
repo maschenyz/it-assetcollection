@@ -3,6 +3,9 @@ import os
 import wmi
 import pythoncom
 import math
+import psutil
+import json
+import subprocess
 
 def get_system_info():
     """Detailed System Info"""
@@ -124,6 +127,145 @@ def collect_monitors():
             print(f"[Monitor] Fallback error: {e2}")
 
     return monitors
+
+
+def collect_storage_volumes():
+    """Collect logical disk capacity and free space for fixed local volumes."""
+    if platform.system() != "Windows":
+        return []
+
+    volumes = []
+    seen_drives = set()
+
+    # =========================================================
+    # 1. PSUTIL - Primary source
+    # =========================================================
+    try:
+        for part in psutil.disk_partitions(all=False):
+
+            drive = (part.mountpoint or "").strip()
+
+            if not drive:
+                continue
+
+            if "cdrom" in (part.opts or "").lower():
+                continue
+
+            try:
+                usage = psutil.disk_usage(drive)
+            except (OSError, PermissionError):
+                continue
+
+            total = usage.total / (1024 ** 3)
+            free = usage.free / (1024 ** 3)
+            used = usage.used / (1024 ** 3)
+
+            drive_key = drive.upper()
+
+            if drive_key in seen_drives:
+                continue
+
+            volumes.append({
+                "drive": drive,
+                "label": "",
+                "size_gb": round(total, 2),
+                "used_gb": round(used, 2),
+                "free_gb": round(free, 2),
+                "usage_percent": round(usage.percent, 1),
+            })
+
+            seen_drives.add(drive_key)
+
+    except Exception as exc:
+        print(f"[Storage] PSUTIL error: {exc}")
+
+    # =========================================================
+    # 2. WMI - Supplement missing volumes
+    # =========================================================
+    try:
+        pythoncom.CoInitialize()
+
+        c = wmi.WMI()
+
+        for disk in c.Win32_LogicalDisk():
+
+            # DriveType 3 = Local Disk
+            if int(getattr(disk, "DriveType", 0) or 0) != 3:
+                continue
+
+            drive = str(
+                getattr(disk, "DeviceID", "") or ""
+            ).strip()
+
+            if not drive:
+                continue
+
+            drive_key = drive.upper()
+
+            # PSUTIL already reported this drive
+            if drive_key in seen_drives:
+                continue
+
+            try:
+                total = float(disk.Size or 0) / (1024 ** 3)
+                free = float(disk.FreeSpace or 0) / (1024 ** 3)
+            except (ValueError, TypeError):
+                continue
+
+            used = max(0.0, total - free)
+
+            volumes.append({
+                "drive": drive,
+                "label": str(
+                    getattr(disk, "VolumeName", "") or ""
+                ),
+                "size_gb": round(total, 2),
+                "used_gb": round(used, 2),
+                "free_gb": round(free, 2),
+                "usage_percent": round(
+                    (used / total) * 100, 1
+                ) if total else 0,
+            })
+
+            seen_drives.add(drive_key)
+
+    except Exception as exc:
+        print(f"[Storage] WMI LogicalDisk error: {exc}")
+
+    # 3. PowerShell/CIM fallback for hosts where both Python providers are restricted.
+    if not volumes:
+        try:
+            command = 'Get-CimInstance Win32_LogicalDisk -Filter "DriveType=3" | Select-Object DeviceID,VolumeName,Size,FreeSpace | ConvertTo-Json -Depth 2'
+            result = subprocess.run(
+                ["powershell", "-NoProfile", "-ExecutionPolicy", "Bypass", "-Command", command],
+                capture_output=True, text=True, timeout=30, shell=False,
+            )
+            raw = json.loads(result.stdout) if result.stdout.strip() else []
+            if isinstance(raw, dict):
+                raw = [raw]
+            for disk in raw:
+                total = float(disk.get("Size") or 0) / (1024 ** 3)
+                free = float(disk.get("FreeSpace") or 0) / (1024 ** 3)
+                used = max(0.0, total - free)
+                volumes.append({
+                    "drive": str(disk.get("DeviceID") or ""),
+                    "label": str(disk.get("VolumeName") or ""),
+                    "size_gb": round(total, 2), "used_gb": round(used, 2),
+                    "free_gb": round(free, 2),
+                    "usage_percent": round((used / total) * 100, 1) if total else 0,
+                })
+        except Exception as exc:
+            print(f"[Storage] PowerShell fallback error: {exc}")
+
+    # =========================================================
+    # 4. Sort drives A-Z
+    # =========================================================
+    volumes.sort(
+        key=lambda x: x.get("drive", "")
+    )
+
+    return volumes
+
 
 def get_hardware_info():
     """Deep Hardware Scan using WMI"""

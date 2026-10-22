@@ -4,55 +4,146 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
+
     <title>Cha-am Hospital IT-Asset Management</title>
-    <link href="https://fonts.googleapis.com/css2?family=Nunito:wght@300;400;600;700;800&display=swap" rel="stylesheet">
+
+    <link href="https://fonts.googleapis.com/css2?family=Nunito:wght@300;400;600;700;800&display=swap"
+        rel="stylesheet">
+
     <link rel="stylesheet" href="/style.css">
+
     <script defer src="https://cdn.jsdelivr.net/npm/alpinejs@3.x.x/dist/cdn.min.js"></script>
 </head>
 
+
 <body x-data="dashboardApp" x-init="init()">
+
+    <!-- =========================================================
+         SAToyama ATMOSPHERE
+         Global background layer
+         ========================================================= -->
+    <div class="satoyama-atmosphere" aria-hidden="true">
+
+        <!-- แสงแดด -->
+        <div class="satoyama-sunlight"></div>
+
+        <!-- เมฆ -->
+        <div class="satoyama-cloud cloud-1"></div>
+        <div class="satoyama-cloud cloud-2"></div>
+
+        <!-- หิ่งห้อย -->
+        <div class="satoyama-fireflies">
+            <span></span>
+            <span></span>
+            <span></span>
+            <span></span>
+            <span></span>
+            <span></span>
+            <span></span>
+            <span></span>
+            <span></span>
+            <span></span>
+        </div>
+
+
+
+    </div>
+
+
+    <!-- =========================================================
+         APPLICATION
+         ========================================================= -->
     <div class="app-container">
 
-        <!-- ===== SIDEBAR ===== -->
+        <!-- Sidebar -->
         <div id="section-sidebar"></div>
 
-        <!-- ===== MAIN CONTENT ===== -->
+
+        <!-- Main Content -->
         <main class="main-content">
+
+            <!-- =================================================
+                 PAGE HEADER
+                 ================================================= -->
             <div class="page-header">
+
                 <div>
                     <h1 class="page-title" x-text="viewTitle"></h1>
-                    <p class="page-sub" x-text="connected ? 'System Online' : 'Connecting to server...'"></p>
+
+                    <p class="page-sub"
+                       x-text="connected
+                            ? 'System Online'
+                            : 'Connecting to server...'">
+                    </p>
                 </div>
+
+
                 <div class="header-actions">
-                    <div class="spinner" x-show="loading"></div>
-                    <button class="btn-primary" @click="refreshData()">🔄 Refresh</button>
+
+                    <div class="spinner"
+                         x-show="loading">
+                    </div>
+
+                    <button class="btn-primary"
+                            @click="refreshData()">
+                        🔄 Refresh
+                    </button>
+
                 </div>
+
             </div>
 
-            <!-- Sections loaded here -->
+
+            <!-- =================================================
+                 APPLICATION SECTIONS
+                 ================================================= -->
+
             <div id="section-dashboard"></div>
+
             <div id="section-devices"></div>
+
             <div id="section-printers"></div>
+
             <div id="section-logs"></div>
+
             <div id="section-master"></div>
+
             <div id="section-reports"></div>
+
             <div id="section-blacklist"></div>
+
             <div id="section-settings"></div>
+
             <div id="section-detail"></div>
+
             <div id="section-software"></div>
+
             <div id="section-screenshots"></div>
+
             <div id="section-live"></div>
 
         </main>
+
     </div>
 
-    <!-- Modals loaded here -->
+
+    <!-- =========================================================
+         MODAL
+         ========================================================= -->
     <div id="section-modal-image"></div>
 
+
+    <!-- =========================================================
+         APPLICATION SCRIPT
+         ========================================================= -->
     <script src="/app.js"></script>
 
+
+    <!-- =========================================================
+         SECTION LOADER
+         ========================================================= -->
     <script>
-        // Load each HTML section into its placeholder
+
         const sections = [
             'sidebar',
             'dashboard',
@@ -67,24 +158,61 @@
             'software',
             'screenshots',
             'live',
-            'modal-image',
+            'modal-image'
         ];
 
-        Promise.all(sections.map(name => {
-            return fetch(`sections/${name}.html?v=` + new Date().getTime())
-                .then(r => r.text())
+
+        Promise.all(
+
+            sections.map(name => {
+
+                return fetch(
+                    `sections/${name}.html?v=` +
+                    new Date().getTime()
+                )
+
+                .then(response => response.text())
+
                 .then(html => {
-                    const el = document.getElementById(`section-${name}`);
+
+                    const el =
+                        document.getElementById(
+                            `section-${name}`
+                        );
+
                     if (!el) return;
+
                     el.innerHTML = html;
-                    if (window.Alpine && window.Alpine.initTree) {
+
+
+                    // ให้ Alpine.js
+                    // ทำงานกับ section ที่โหลดเข้ามาใหม่
+                    if (
+                        window.Alpine &&
+                        window.Alpine.initTree
+                    ) {
+
                         window.Alpine.initTree(el);
+
                     }
+
                 })
-                .catch(err => console.warn(`Could not load section: ${name}`, err));
-        }));
+
+                .catch(err => {
+
+                    console.warn(
+                        `Could not load section: ${name}`,
+                        err
+                    );
+
+                });
+
+            })
+
+        );
 
     </script>
+
 </body>
 
 </html>
